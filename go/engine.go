@@ -70,7 +70,7 @@ func (e *Engine) alphaBeta(depth int, pos chess.Position, alpha float64, beta fl
 	}
 	var bestMove *chess.Move
 	for _, move := range pos.ValidMoves() {
-		pos.Update(move)
+		pos = *pos.Update(move)
 		_, value := e.alphaBeta(depth-1, pos, alpha, beta, !isMax)
 		if isMax {
 			if bestValue <= value {
@@ -177,9 +177,4 @@ func timer(name string) func() {
 	return func() {
 		fmt.Printf("%s took %v\n", name, time.Since(start))
 	}
-}
-
-func isGameOver(pos chess.Position) bool {
-	method := pos.Status()
-	return method.String() == "NoMethod"
 }
