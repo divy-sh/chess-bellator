@@ -3,33 +3,20 @@ package main
 import (
 	"fmt"
 	"math"
-	"strconv"
+	"sort"
 	"time"
 
 	"github.com/notnil/chess"
 )
 
-type MoveEvalPair struct {
-	move *chess.Move
-	eval float64
-}
-
 type Engine struct {
-	game              *chess.Game
-	tranposTable      map[string]MoveEvalPair
-	transposTableHits int
+	game *chess.Game
 }
 
 func newEngine(game *chess.Game) *Engine {
 	return &Engine{
-		game:         game,
-		tranposTable: map[string]MoveEvalPair{},
+		game: game,
 	}
-}
-
-func (e *Engine) genMove(depth int) *chess.Move {
-	move, _ := e.alphaBeta(depth, *e.game.Position(), math.Inf(-1), math.Inf(1), e.game.Position().Turn() == chess.White)
-	return move
 }
 
 func (e *Engine) genMoveIterative(seconds int) *chess.Move {
@@ -53,12 +40,13 @@ func (e *Engine) genMoveIterative(seconds int) *chess.Move {
 	}
 }
 
+func (e *Engine) genMove(depth int) *chess.Move {
+	defer timer("genMove")()
+	move, _ := e.alphaBeta(depth, *e.game.Position(), math.Inf(-1), math.Inf(1), e.game.Position().Turn() == chess.White)
+	return move
+}
+
 func (e *Engine) alphaBeta(depth int, pos chess.Position, alpha float64, beta float64, isMax bool) (*chess.Move, float64) {
-	transPosTableKey := pos.String() + fmt.Sprint(depth) + strconv.FormatFloat(alpha, 'f', -1, 64) + strconv.FormatFloat(beta, 'f', -1, 64)
-	if val, ok := e.tranposTable[transPosTableKey]; ok {
-		e.transposTableHits++
-		return val.move, val.eval
-	}
 	if depth == 0 {
 		return nil, e.eval(pos, isMax)
 	}
@@ -69,9 +57,38 @@ func (e *Engine) alphaBeta(depth int, pos chess.Position, alpha float64, beta fl
 		bestValue = math.Inf(1)
 	}
 	var bestMove *chess.Move
-	for _, move := range pos.ValidMoves() {
+	moves := pos.ValidMoves()
+	sort.Slice(moves, func(i int, j int) bool {
+		iPriority := 0.0
+		jPriority := 0.0
+		// check if promotion move
+		if moves[i].Promo() != chess.NoPiece.Type() {
+			iPriority += pieceVal[moves[i].Promo()] / pieceVal[chess.Queen]
+		}
+		if moves[j].Promo() != chess.NoPiece.Type() {
+			jPriority += pieceVal[moves[j].Promo()] / pieceVal[chess.Queen]
+		}
+		// check if capture move
+		if pos.Board().Piece(moves[i].S2()) != chess.NoPiece {
+			iPriority += pieceVal[pos.Board().Piece(moves[i].S2()).Type()] / pieceVal[chess.Queen]
+		}
+		if pos.Board().Piece(moves[j].S2()) != chess.NoPiece {
+			iPriority += pieceVal[pos.Board().Piece(moves[j].S2()).Type()] / pieceVal[chess.Queen]
+		}
+		//check if check
+		if moves[i].HasTag(chess.Check) {
+			iPriority += 0.5
+		}
+		if moves[j].HasTag(chess.Check) {
+			jPriority += 0.5
+		}
+		return iPriority > jPriority
+	})
+	for _, move := range moves {
+		prevPos := pos
 		pos = *pos.Update(move)
 		_, value := e.alphaBeta(depth-1, pos, alpha, beta, !isMax)
+		pos = prevPos
 		if isMax {
 			if bestValue <= value {
 				bestValue = value
@@ -86,11 +103,9 @@ func (e *Engine) alphaBeta(depth int, pos chess.Position, alpha float64, beta fl
 			beta = math.Min(beta, bestValue)
 		}
 		if beta <= alpha {
-			e.tranposTable[transPosTableKey] = MoveEvalPair{move: bestMove, eval: bestValue}
 			return bestMove, bestValue
 		}
 	}
-	e.tranposTable[transPosTableKey] = MoveEvalPair{move: bestMove, eval: bestValue}
 	return bestMove, bestValue
 }
 
@@ -100,11 +115,11 @@ func (e *Engine) eval(pos chess.Position, isMax bool) float64 {
 	var positionalVal float64
 	var mobilityVal float64
 	for square, piece := range pos.Board().SquareMap() {
-		if piece.Color().String() == "w" {
-			materialVal += pieceVal[piece.Type().String()]
+		if piece.Color() == chess.White {
+			materialVal += pieceVal[piece.Type()]
 			positionalVal += e.getPieceSquareTable(pos, &square, &piece)
 		} else {
-			materialVal -= pieceVal[piece.Type().String()]
+			materialVal -= pieceVal[piece.Type()]
 			positionalVal -= e.getPieceSquareTable(pos, &square, &piece)
 		}
 	}
@@ -120,48 +135,47 @@ func (e *Engine) eval(pos chess.Position, isMax bool) float64 {
 
 func (e *Engine) getPieceSquareTable(pos chess.Position, square *chess.Square, piece *chess.Piece) float64 {
 	sq := int(*square)
-	if piece.Color().String() == "w" {
-		if piece.Type().String() == "p" {
+	if piece.Color() == chess.White {
+		if piece.Type() == chess.Pawn {
 			return pawnTable[sq]
 		}
-		if piece.Type().String() == "n" {
+		if piece.Type() == chess.Knight {
 			return knightTable[sq]
 		}
-		if piece.Type().String() == "b" {
+		if piece.Type() == chess.Bishop {
 			return bishopTable[sq]
 		}
-		if piece.Type().String() == "r" {
+		if piece.Type() == chess.Rook {
 			return rookTable[sq]
 		}
-		if piece.Type().String() == "q" {
+		if piece.Type() == chess.Queen {
 			return queenTable[sq]
 		}
-		if piece.Type().String() == "k" {
+		if piece.Type() == chess.King {
 			gamePhase := e.getGamePhase(pos)
 			return gamePhase*kingMiddleGameTable[sq] + (1-gamePhase)*kingEndGameTable[sq]
 		}
 	} else {
-		if piece.Type().String() == "p" {
+		if piece.Type() == chess.Pawn {
 			return revPawnTable[sq]
 		}
-		if piece.Type().String() == "n" {
+		if piece.Type() == chess.Knight {
 			return revKnightTable[sq]
 		}
-		if piece.Type().String() == "b" {
+		if piece.Type() == chess.Bishop {
 			return revBishopTable[sq]
 		}
-		if piece.Type().String() == "r" {
+		if piece.Type() == chess.Rook {
 			return revRookTable[sq]
 		}
-		if piece.Type().String() == "q" {
+		if piece.Type() == chess.Queen {
 			return revQueenTable[sq]
 		}
-		if piece.Type().String() == "k" {
+		if piece.Type() == chess.King {
 			gamePhase := e.getGamePhase(pos)
 			return gamePhase*revKingMiddleGameTable[sq] + (1-gamePhase)*revKingEndGameTable[sq]
 		}
 	}
-	fmt.Println("getPieceSquareTable not working correctly")
 	return 0
 }
 
@@ -170,11 +184,4 @@ func (e *Engine) getGamePhase(pos chess.Position) float64 {
 	maxPieces := 32
 	gamePhase := totalPieces / maxPieces
 	return float64(gamePhase)
-}
-
-func timer(name string) func() {
-	start := time.Now()
-	return func() {
-		fmt.Printf("%s took %v\n", name, time.Since(start))
-	}
 }

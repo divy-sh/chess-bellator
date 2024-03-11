@@ -1,8 +1,10 @@
 package main
 
+import "github.com/notnil/chess"
+
 var (
-	pieceVal = map[string]float64{
-		"r": 500, "p": 100, "b": 300, "n": 300, "q": 900, "k": 10000,
+	pieceVal = map[chess.PieceType]float64{
+		chess.Rook: 500, chess.Pawn: 100, chess.Bishop: 300, chess.Knight: 300, chess.Queen: 900, chess.King: 10000,
 	}
 
 	pawnTable = [64]float64{
