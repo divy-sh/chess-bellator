@@ -16,7 +16,7 @@ func run() {
 	game := chess.NewGame()
 	engine := newEngine(game)
 	for game.Outcome() == chess.NoOutcome {
-		move := engine.genMove(5)
+		move := engine.genMoveIterative(1)
 		game.Move(move)
 		fmt.Println(game.Position().Board().Draw(), move)
 	}

@@ -48,7 +48,7 @@ func (e *Engine) genMove(depth int) *chess.Move {
 
 func (e *Engine) alphaBeta(depth int, pos *chess.Position, alpha float64, beta float64, isMax bool) (*chess.Move, float64) {
 	if depth == 0 {
-		return nil, e.eval(pos, isMax)
+		return nil, e.eval(pos)
 	}
 	bestValue := 0.0
 	if isMax {
@@ -110,7 +110,7 @@ func (e *Engine) alphaBeta(depth int, pos *chess.Position, alpha float64, beta f
 }
 
 // returns a basic eval of the position
-func (e *Engine) eval(pos *chess.Position, isMax bool) float64 {
+func (e *Engine) eval(pos *chess.Position) float64 {
 	var value float64
 	var materialVal float64
 	var positionalVal float64
