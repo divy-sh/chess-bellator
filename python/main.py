@@ -14,6 +14,10 @@ def main():
     
 def AIvsAI(game, engine, view):
     while True:
+        if game.gameOver():
+            print("game over!")
+            print(game.outcome())
+            return
         start_time = time.time()
         move = engine.genMoveIterative(1)
         game.playMove(move)
