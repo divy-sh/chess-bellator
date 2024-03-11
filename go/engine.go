@@ -42,11 +42,11 @@ func (e *Engine) genMoveIterative(seconds int) *chess.Move {
 
 func (e *Engine) genMove(depth int) *chess.Move {
 	defer timer("genMove")()
-	move, _ := e.alphaBeta(depth, *e.game.Position(), math.Inf(-1), math.Inf(1), e.game.Position().Turn() == chess.White)
+	move, _ := e.alphaBeta(depth, e.game.Position(), math.Inf(-1), math.Inf(1), e.game.Position().Turn() == chess.White)
 	return move
 }
 
-func (e *Engine) alphaBeta(depth int, pos chess.Position, alpha float64, beta float64, isMax bool) (*chess.Move, float64) {
+func (e *Engine) alphaBeta(depth int, pos *chess.Position, alpha float64, beta float64, isMax bool) (*chess.Move, float64) {
 	if depth == 0 {
 		return nil, e.eval(pos, isMax)
 	}
@@ -86,7 +86,7 @@ func (e *Engine) alphaBeta(depth int, pos chess.Position, alpha float64, beta fl
 	})
 	for _, move := range moves {
 		prevPos := pos
-		pos = *pos.Update(move)
+		pos = pos.Update(move)
 		_, value := e.alphaBeta(depth-1, pos, alpha, beta, !isMax)
 		pos = prevPos
 		if isMax {
@@ -109,11 +109,13 @@ func (e *Engine) alphaBeta(depth int, pos chess.Position, alpha float64, beta fl
 	return bestMove, bestValue
 }
 
-func (e *Engine) eval(pos chess.Position, isMax bool) float64 {
+// returns a basic eval of the position
+func (e *Engine) eval(pos *chess.Position, isMax bool) float64 {
 	var value float64
 	var materialVal float64
 	var positionalVal float64
 	var mobilityVal float64
+	centerControlVal := evaluateCenterControl(pos)
 	for square, piece := range pos.Board().SquareMap() {
 		if piece.Color() == chess.White {
 			materialVal += pieceVal[piece.Type()]
@@ -123,55 +125,46 @@ func (e *Engine) eval(pos chess.Position, isMax bool) float64 {
 			positionalVal -= e.getPieceSquareTable(pos, &square, &piece)
 		}
 	}
-	if isMax {
-		mobilityVal -= float64(len(pos.ValidMoves()))
-	} else {
-		mobilityVal += float64(len(pos.ValidMoves()))
+	value = materialVal + positionalVal + mobilityVal + centerControlVal
+	gamePhase := e.getGamePhase(pos)
+	if pos.String() == "r1bk1b1r/p1p2pp1/2p2n1p/2q5/3p3P/2N3Q1/PPPP1PP1/R1B1K1NR b KQ - 0 12" {
+		fmt.Println(value, materialVal, positionalVal, mobilityVal, centerControlVal)
 	}
-	value = materialVal + positionalVal + mobilityVal
-
+	value = value*gamePhase + (1-gamePhase)*materialVal
 	return value
 }
 
-func (e *Engine) getPieceSquareTable(pos chess.Position, square *chess.Square, piece *chess.Piece) float64 {
+func (e *Engine) getPieceSquareTable(pos *chess.Position, square *chess.Square, piece *chess.Piece) float64 {
 	sq := int(*square)
 	if piece.Color() == chess.White {
-		if piece.Type() == chess.Pawn {
+		switch piece.Type() {
+		case chess.Pawn:
 			return pawnTable[sq]
-		}
-		if piece.Type() == chess.Knight {
+		case chess.Knight:
 			return knightTable[sq]
-		}
-		if piece.Type() == chess.Bishop {
+		case chess.Bishop:
 			return bishopTable[sq]
-		}
-		if piece.Type() == chess.Rook {
+		case chess.Rook:
 			return rookTable[sq]
-		}
-		if piece.Type() == chess.Queen {
+		case chess.Queen:
 			return queenTable[sq]
-		}
-		if piece.Type() == chess.King {
+		case chess.King:
 			gamePhase := e.getGamePhase(pos)
 			return gamePhase*kingMiddleGameTable[sq] + (1-gamePhase)*kingEndGameTable[sq]
 		}
 	} else {
-		if piece.Type() == chess.Pawn {
+		switch piece.Type() {
+		case chess.Pawn:
 			return revPawnTable[sq]
-		}
-		if piece.Type() == chess.Knight {
+		case chess.Knight:
 			return revKnightTable[sq]
-		}
-		if piece.Type() == chess.Bishop {
+		case chess.Bishop:
 			return revBishopTable[sq]
-		}
-		if piece.Type() == chess.Rook {
+		case chess.Rook:
 			return revRookTable[sq]
-		}
-		if piece.Type() == chess.Queen {
+		case chess.Queen:
 			return revQueenTable[sq]
-		}
-		if piece.Type() == chess.King {
+		case chess.King:
 			gamePhase := e.getGamePhase(pos)
 			return gamePhase*revKingMiddleGameTable[sq] + (1-gamePhase)*revKingEndGameTable[sq]
 		}
@@ -179,9 +172,26 @@ func (e *Engine) getPieceSquareTable(pos chess.Position, square *chess.Square, p
 	return 0
 }
 
-func (e *Engine) getGamePhase(pos chess.Position) float64 {
-	totalPieces := len(pos.Board().SquareMap())
-	maxPieces := 32
+// evaluateCenterControl evaluates the control of the center squares (e4, e5, d4, d5)
+func evaluateCenterControl(pos *chess.Position) float64 {
+	var score float64
+	centerSquares := []chess.Square{chess.E4, chess.E5, chess.D4, chess.D5}
+
+	for _, square := range centerSquares {
+		if pos.Board().Piece(square) != chess.NoPiece {
+			if pos.Board().Piece(square).Color() == chess.White {
+				score += pieceVal[pos.Board().Piece(square).Type()]
+			} else {
+				score -= pieceVal[pos.Board().Piece(square).Type()]
+			}
+		}
+	}
+	return score
+}
+
+func (e *Engine) getGamePhase(pos *chess.Position) float64 {
+	totalPieces := float64(len(pos.Board().SquareMap()))
+	maxPieces := 32.0
 	gamePhase := totalPieces / maxPieces
 	return float64(gamePhase)
 }
