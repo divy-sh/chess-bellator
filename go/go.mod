@@ -1,4 +1,4 @@
-module chess-ai-alpha-beta-pruning
+module chess-bellator
 
 go 1.21.5
 
