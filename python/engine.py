@@ -5,8 +5,6 @@ import evalConstants
 
 class Engine:
     def __init__(self, board : chess.Board) -> None:
-        self.transpositionTable = {}
-        self.transpositionTableHit = 0
         self.board = board
 
     #iterative deepening until time runs out
@@ -26,10 +24,6 @@ class Engine:
         return move.uci()
     
     def alphaBeta(self, depth: int, alpha: float, beta: float, isMax: bool) -> tuple[chess.Move, float]:
-        position_key = self.board.fen() + str(depth) + str(alpha) + str(beta)
-        if position_key in self.transpositionTable:
-            return self.transpositionTable[position_key]
-        
         if depth == 0:
             return None, self.evaluate(isMax)
         
@@ -56,9 +50,7 @@ class Engine:
                     bestMove = move
                 beta = min(beta, bestValue)
             if beta <= alpha:
-                self.transpositionTable[position_key] = (bestMove, bestValue)
                 return bestMove, bestValue
-        self.transpositionTable[position_key] = (bestMove, bestValue)
         return bestMove, bestValue
 
     def evaluate(self, isMax: bool) -> float:
@@ -75,10 +67,12 @@ class Engine:
                 positional_value -= self.get_piece_square_table(piece.piece_type, square, chess.BLACK)
         
         mobility_value = 0
-        if isMax:
-            mobility_value -= len(list(board.legal_moves))
-        else:
-            mobility_value += len(list(board.legal_moves))
+        for square in chess.SQUARES:
+            if board.is_attacked_by(chess.WHITE, square):
+                mobility_value += 50
+
+            if board.is_attacked_by(chess.BLACK, square):
+                mobility_value -= 50
         
         center_squares = [chess.E4, chess.D4, chess.E5, chess.D5]
         center_control_value = 0
@@ -86,9 +80,9 @@ class Engine:
             piece = board.piece_at(square)
             if piece is not None:
                 if piece.color == chess.WHITE:
-                    center_control_value += evalConstants.pieceValue[chess.piece_name(piece.piece_type)]
+                    center_control_value += 50
                 else:
-                    center_control_value -= evalConstants.pieceValue[chess.piece_name(piece.piece_type)]
+                    center_control_value -= 50
         
         value = material_value + positional_value + mobility_value + center_control_value
         game_phase = self.get_game_phase()
