@@ -4,29 +4,28 @@ import time
 import evalConstants
 
 class Engine:
-    def __init__(self, board) -> None:
+    def __init__(self, board : chess.Board) -> None:
         self.transpositionTable = {}
         self.transpositionTableHit = 0
         self.board = board
 
-    # generate move with fixed depth alpha-beta search
-    def genMove(self, depth):
-        move, _ = self.alphaBeta(depth, float('-inf'), float('inf'), self.board.turn)
-        return move.uci()
-    
     #iterative deepening until time runs out
-    def genMoveIterative(self, seconds):    
+    def genMoveIterative(self, seconds: float) -> str:    
         timeout = time.time() + seconds
         depth = 2
         move = None
         while time.time() < timeout:
             depth += 1
-            move, _ = self.alphaBeta(depth, float('-inf'), float('inf'), self.board.turn)
-
+            move = self.genMove(depth)
         print(f"depth reached - {depth}")
-        return move.uci()
+        return move
 
-    def alphaBeta(self, depth, alpha, beta, isMax):
+    # generate move with fixed depth alpha-beta search
+    def genMove(self, depth: int) -> str:
+        move, _ = self.alphaBeta(depth, float('-inf'), float('inf'), self.board.turn)
+        return move.uci()
+    
+    def alphaBeta(self, depth: int, alpha: float, beta: float, isMax: bool) -> tuple[chess.Move, float]:
         position_key = self.board.fen() + str(depth) + str(alpha) + str(beta)
         if position_key in self.transpositionTable:
             return self.transpositionTable[position_key]
@@ -62,7 +61,7 @@ class Engine:
         self.transpositionTable[position_key] = (bestMove, bestValue)
         return bestMove, bestValue
 
-    def evaluate(self, isMax):
+    def evaluate(self, isMax: bool) -> float:
         value = 0
         board = self.board
         material_value = 0
@@ -96,7 +95,7 @@ class Engine:
         value = value * game_phase + (1 - game_phase) * material_value
         return value
 
-    def get_piece_square_table(self, piece_type, square, color):
+    def get_piece_square_table(self, piece_type: chess.PieceType, square: chess.Square, color: chess.Color) -> float:
         # Define piece-square tables for both colors
         # Flip the table based on the color
         if color == chess.BLACK:
