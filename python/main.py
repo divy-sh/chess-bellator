@@ -9,8 +9,8 @@ def main():
     game = Game()
     view = View(game.getBoard())
     engine = Engine(game.getBoard())
-    # AIvsAI(game, engine, view)
-    playerVsAI(game, engine, view)
+    AIvsAI(game, engine, view)
+    # playerVsAI(game, engine, view)
     
 def AIvsAI(game, engine, view):
     while True:

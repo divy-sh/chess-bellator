@@ -1,97 +1,13 @@
 import chess
 import chess.engine
 import time
+import evalConstants
 
 class Engine:
     def __init__(self, board) -> None:
         self.transpositionTable = {}
         self.transpositionTableHit = 0
         self.board = board
-        self.pieceValue = {'rook': 500, 'pawn' : 100, 'bishop': 300, 'knight' : 300, 'queen': 900, 'king': 10000}
-
-        self.pawn_table = [
-            0,  0,  0,  0,  0,  0,  0,  0,
-            50, 50, 50, 50, 50, 50, 50, 50,
-            10, 10, 20, 30, 30, 20, 10, 10,
-            5,  5, 10, 25, 25, 10,  5,  5,
-            0,  0,  0, 20, 20,  0,  0,  0,
-            5, -5,-10,  0,  0,-10, -5,  5,
-            5, 10, 10,-20,-20, 10, 10,  5,
-            0,  0,  0,  0,  0,  0,  0,  0
-        ]
-        self.rev_pawn_table = list(reversed(self.pawn_table))
-
-        self.knight_table = [
-            -50,-40,-30,-30,-30,-30,-40,-50,
-            -40,-20,  0,  0,  0,  0,-20,-40,
-            -30,  0, 10, 15, 15, 10,  0,-30,
-            -30,  5, 15, 20, 20, 15,  5,-30,
-            -30,  0, 15, 20, 20, 15,  0,-30,
-            -30,  5, 10, 15, 15, 10,  5,-30,
-            -40,-20,  0,  5,  5,  0,-20,-40,
-            -50,-40,-30,-30,-30,-30,-40,-50
-        ]
-        self.rev_knight_table = list(reversed(self.knight_table))
-
-        self.bishop_table = [
-            -20,-10,-10,-10,-10,-10,-10,-20,
-            -10,  0,  0,  0,  0,  0,  0,-10,
-            -10,  0,  5, 10, 10,  5,  0,-10,
-            -10,  5,  5, 10, 10,  5,  5,-10,
-            -10,  0, 10, 10, 10, 10,  0,-10,
-            -10, 10, 10, 10, 10, 10, 10,-10,
-            -10,  5,  0,  0,  0,  0,  5,-10,
-            -20,-10,-10,-10,-10,-10,-10,-20
-        ]
-        self.rev_bishop_table = list(reversed(self.bishop_table))
-
-        self.rook_table = [
-            0,  0,  0,  0,  0,  0,  0,  0,
-            5, 10, 10, 10, 10, 10, 10,  5,
-            -5,  0,  0,  0,  0,  0,  0, -5,
-            -5,  0,  0,  0,  0,  0,  0, -5,
-            -5,  0,  0,  0,  0,  0,  0, -5,
-            -5,  0,  0,  0,  0,  0,  0, -5,
-            -5,  0,  0,  0,  0,  0,  0, -5,
-            0,  0,  0,  5,  5,  0,  0,  0
-        ]
-        self.rev_rook_table = list(reversed(self.rook_table))
-
-        self.queen_table = [
-            -20,-10,-10, -5, -5,-10,-10,-20,
-            -10,  0,  0,  0,  0,  0,  0,-10,
-            -10,  0,  5,  5,  5,  5,  0,-10,
-            -5,  0,  5,  5,  5,  5,  0, -5,
-            0,  0,  5,  5,  5,  5,  0, -5,
-            -10,  5,  5,  5,  5,  5,  0,-10,
-            -10,  0,  5,  0,  0,  0,  0,-10,
-            -20,-10,-10, -5, -5,-10,-10,-20
-        ]
-        self.rev_queen_table = list(reversed(self.queen_table))
-
-        self.king_middle_game_table = [
-            -30,-40,-40,-50,-50,-40,-40,-30,
-            -30,-40,-40,-50,-50,-40,-40,-30,
-            -30,-40,-40,-50,-50,-40,-40,-30,
-            -30,-40,-40,-50,-50,-40,-40,-30,
-            -20,-30,-30,-40,-40,-30,-30,-20,
-            -10,-20,-20,-20,-20,-20,-20,-10,
-            20, 20,  0,  0,  0,  0, 20, 20,
-            20, 30, 10,  0,  0, 10, 30, 20
-        ]
-        self.rev_king_middle_game_table = list(reversed(self.king_middle_game_table))
-
-        self.king_end_game_table = [
-            -50,-40,-30,-20,-20,-30,-40,-50,
-            -30,-20,-10,  0,  0,-10,-20,-30,
-            -30,-10, 20, 30, 30, 20,-10,-30,
-            -30,-10, 30, 40, 40, 30,-10,-30,
-            -30,-10, 30, 40, 40, 30,-10,-30,
-            -30,-10, 20, 30, 30, 20,-10,-30,
-            -30,-30,  0,  0,  0,  0,-30,-30,
-            -50,-30,-30,-30,-30,-30,-30,-50
-        ]
-        self.rev_king_end_game_table = list(reversed(self.king_end_game_table))
 
     # generate move with fixed depth alpha-beta search
     def genMove(self, depth):
@@ -153,10 +69,10 @@ class Engine:
         positional_value = 0
         for square, piece in board.piece_map().items():
             if piece.color == chess.WHITE:
-                material_value += self.pieceValue[chess.piece_name(piece.piece_type)]
+                material_value += evalConstants.pieceValue[chess.piece_name(piece.piece_type)]
                 positional_value += self.get_piece_square_table(piece.piece_type, square, chess.WHITE)
             else:
-                material_value -= self.pieceValue[chess.piece_name(piece.piece_type)]
+                material_value -= evalConstants.pieceValue[chess.piece_name(piece.piece_type)]
                 positional_value -= self.get_piece_square_table(piece.piece_type, square, chess.BLACK)
         
         mobility_value = 0
@@ -171,9 +87,9 @@ class Engine:
             piece = board.piece_at(square)
             if piece is not None:
                 if piece.color == chess.WHITE:
-                    center_control_value += self.pieceValue[chess.piece_name(piece.piece_type)]
+                    center_control_value += evalConstants.pieceValue[chess.piece_name(piece.piece_type)]
                 else:
-                    center_control_value -= self.pieceValue[chess.piece_name(piece.piece_type)]
+                    center_control_value -= evalConstants.pieceValue[chess.piece_name(piece.piece_type)]
         
         value = material_value + positional_value + mobility_value + center_control_value
         game_phase = self.get_game_phase()
@@ -184,21 +100,21 @@ class Engine:
         # Define piece-square tables for both colors
         # Flip the table based on the color
         if color == chess.BLACK:
-            pawn_table = self.rev_pawn_table
-            knight_table = self.rev_knight_table
-            bishop_table = self.rev_bishop_table
-            rook_table = self.rev_rook_table
-            queen_table = self.rev_queen_table
-            king_middle_game_table = self.rev_king_middle_game_table
-            king_end_game_table = self.rev_king_end_game_table
+            pawn_table = evalConstants.rev_pawn_table
+            knight_table = evalConstants.rev_knight_table
+            bishop_table = evalConstants.rev_bishop_table
+            rook_table = evalConstants.rev_rook_table
+            queen_table = evalConstants.rev_queen_table
+            king_middle_game_table = evalConstants.rev_king_middle_game_table
+            king_end_game_table = evalConstants.rev_king_end_game_table
         else:
-            pawn_table = self.pawn_table
-            knight_table = self.knight_table
-            bishop_table = self.bishop_table
-            rook_table = self.rook_table
-            queen_table = self.queen_table
-            king_middle_game_table = self.king_middle_game_table
-            king_end_game_table = self.king_end_game_table
+            pawn_table = evalConstants.pawn_table
+            knight_table = evalConstants.knight_table
+            bishop_table = evalConstants.bishop_table
+            rook_table = evalConstants.rook_table
+            queen_table = evalConstants.queen_table
+            king_middle_game_table = evalConstants.king_middle_game_table
+            king_end_game_table = evalConstants.king_end_game_table
 
         # Return the corresponding table for the given piece type
         if piece_type == chess.PAWN:
