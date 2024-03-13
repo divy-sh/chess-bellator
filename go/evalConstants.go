@@ -4,7 +4,7 @@ import "github.com/notnil/chess"
 
 var (
 	pieceVal = map[chess.PieceType]float64{
-		chess.Rook: 500, chess.Pawn: 100, chess.Bishop: 300, chess.Knight: 300, chess.Queen: 900, chess.King: 10000,
+		chess.Rook: 50, chess.Pawn: 10, chess.Bishop: 30, chess.Knight: 30, chess.Queen: 90, chess.King: 1000,
 	}
 
 	pawnTable = [64]float64{

@@ -127,9 +127,6 @@ func (e *Engine) eval(pos *chess.Position) float64 {
 	}
 	value = materialVal + positionalVal + mobilityVal + centerControlVal
 	gamePhase := e.getGamePhase(pos)
-	if pos.String() == "r1bk1b1r/p1p2pp1/2p2n1p/2q5/3p3P/2N3Q1/PPPP1PP1/R1B1K1NR b KQ - 0 12" {
-		fmt.Println(value, materialVal, positionalVal, mobilityVal, centerControlVal)
-	}
 	value = value*gamePhase + (1-gamePhase)*materialVal
 	return value
 }
