@@ -20,11 +20,13 @@ class Engine:
 
     # generate move with fixed depth alpha-beta search
     def genMove(self, depth: int) -> str:
-        move, _ = self.alphaBeta(depth, float('-inf'), float('inf'), self.board.turn)
+        move, _ = self.alphaBeta(depth, float('-inf'), float('inf'), self.board.turn, False)
         return move.uci()
     
-    def alphaBeta(self, depth: int, alpha: float, beta: float, isMax: bool) -> tuple[chess.Move, float]:
+    def alphaBeta(self, depth: int, alpha: float, beta: float, isMax: bool, lastMoveSpecial: bool) -> tuple[chess.Move, float]:
         if depth == 0:
+            if lastMoveSpecial:
+                return self.qSearch(alpha, beta, not isMax, lastMoveSpecial)
             return None, self.evaluate(isMax)
         
         if isMax:
@@ -36,8 +38,38 @@ class Engine:
                        key=lambda move: (self.board.piece_at(move.to_square) 
                         is None, move.from_square, move.to_square))
         for move in moves:
+            isSpecial = self.board.is_capture(move)
             self.board.push_uci(move.uci())
-            _, value = self.alphaBeta(depth - 1, alpha, beta, not isMax)
+            isSpecial = isSpecial or self.board.is_check()
+            _, value = self.alphaBeta(depth - 1, alpha, beta, not isMax, isSpecial)
+            self.board.pop()
+            if isMax:
+                if bestValue <= value:
+                    bestValue = value
+                    bestMove = move
+                alpha = max(alpha, bestValue)
+            else:
+                if bestValue >= value:
+                    bestValue = value
+                    bestMove = move
+                beta = min(beta, bestValue)
+            if beta <= alpha:
+                return bestMove, bestValue
+        return bestMove, bestValue
+
+    def qSearch(self, alpha: float, beta: float, isMax: bool, lastMoveSpecial: bool):
+        if not lastMoveSpecial:
+            return None, self.evaluate(isMax)
+        if isMax:
+            bestValue = float('-inf')
+        else:
+            bestValue = float('inf')
+        bestMove = None
+        for move in self.board.legal_moves:
+            isSpecial = self.board.is_capture(move)
+            self.board.push_uci(move.uci())
+            isSpecial = isSpecial or self.board.is_check()
+            _, value = self.qSearch(alpha, beta, not isMax, isSpecial)
             self.board.pop()
             if isMax:
                 if bestValue <= value:
