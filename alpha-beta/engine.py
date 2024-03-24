@@ -1,7 +1,7 @@
 import chess
 import chess.engine
 import time
-import nneval as evaluation
+import eval as evaluation
 
 class Engine:
     def __init__(self, board : chess.Board) -> None:

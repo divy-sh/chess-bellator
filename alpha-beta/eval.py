@@ -117,7 +117,7 @@ def evaluate(board: chess.Board, isMax: bool) -> float:
                     center_control_value -= 50
         
         value = material_value + positional_value + mobility_value + center_control_value
-        game_phase = get_game_phase()
+        game_phase = get_game_phase(board)
         value = value * game_phase + (1 - game_phase) * material_value
         return value
 
@@ -125,37 +125,37 @@ def get_piece_square_table(board: chess.Board, piece_type: chess.PieceType, squa
     # Define piece-square tables for both colors
     # Flip the table based on the color
     if color == chess.BLACK:
-        pawn_table = rev_pawn_table
-        knight_table = rev_knight_table
-        bishop_table = rev_bishop_table
-        rook_table = rev_rook_table
-        queen_table = rev_queen_table
-        king_middle_game_table = rev_king_middle_game_table
-        king_end_game_table = rev_king_end_game_table
+        pt = rev_pawn_table
+        kt = rev_knight_table
+        bt = rev_bishop_table
+        rt = rev_rook_table
+        qt = rev_queen_table
+        kmt = rev_king_middle_game_table
+        ket = rev_king_end_game_table
     else:
-        pawn_table = pawn_table
-        knight_table = knight_table
-        bishop_table = bishop_table
-        rook_table = rook_table
-        queen_table = queen_table
-        king_middle_game_table = king_middle_game_table
-        king_end_game_table = king_end_game_table
+        pt = pawn_table
+        kt = knight_table
+        bt = bishop_table
+        rt = rook_table
+        qt = queen_table
+        kmt = king_middle_game_table
+        ket = king_end_game_table
 
     # Return the corresponding table for the given piece type
     if piece_type == chess.PAWN:
-        return pawn_table[square]
+        return pt[square]
     elif piece_type == chess.KNIGHT:
-        return knight_table[square]
+        return kt[square]
     elif piece_type == chess.BISHOP:
-        return bishop_table[square]
+        return bt[square]
     elif piece_type == chess.ROOK:
-        return rook_table[square]
+        return rt[square]
     elif piece_type == chess.QUEEN:
-        return queen_table[square]
+        return qt[square]
     elif piece_type == chess.KING:
         # Use a weighted average of the middle game and end game tables
-        game_phase = get_game_phase()
-        return game_phase * king_middle_game_table[square] + (1 - game_phase) * king_end_game_table[square]
+        game_phase = get_game_phase(board)
+        return game_phase * kmt[square] + (1 - game_phase) * ket[square]
 
 def get_game_phase(board: chess.Board):
     total_pieces = sum(1 for _ in board.occupied_co)
