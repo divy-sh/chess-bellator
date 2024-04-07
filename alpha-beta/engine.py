@@ -2,90 +2,87 @@ import chess
 import chess.engine
 import time
 import eval as evaluation
+from concurrent.futures import ProcessPoolExecutor
 
-class Engine:
-    def __init__(self, board : chess.Board) -> None:
-        self.board = board
 
-    #iterative deepening until time runs out
-    def genMoveIterative(self, seconds: float) -> str:    
-        timeout = time.time() + seconds
-        depth = 2
-        move = None
-        while time.time() < timeout:
-            depth += 1
-            move = self.genMove(depth)
-        print(f"depth reached - {depth}")
-        return move
+def genMoveIterative(seconds: float, board: chess.Board) -> str:    
+    timeout = time.time() + seconds
+    depth = 2
+    move = None
+    while time.time() < timeout:
+        depth += 1
+        move = genMove(depth)
+    print(f"depth reached - {depth}")
+    return move
 
-    # generate move with fixed depth alpha-beta search
-    def genMove(self, depth: int) -> str:
-        move, _ = self.alphaBeta(depth, float('-inf'), float('inf'), self.board.turn, False)
-        return move.uci()
+# generate move with fixed depth alpha-beta search
+def genMove(depth: int, board: chess.Board) -> str:
+    if board.is_checkmate():
+        return None, float('-inf')
+    moves = getOrderedMoves(onlyCaptures=False, board=board)
+    if not moves:
+        return None, 0
     
-    def alphaBeta(self, depth: int, alpha: float, beta: float, isMax: bool, lastMoveSpecial: bool) -> tuple[chess.Move, float]:
-        if depth == 0:
-            if self.board.is_checkmate():
-                if isMax:
-                    return None, float('-inf')
-                else:
-                    return None, float('inf')
-            # if lastMoveSpecial:
-            #     return self.qSearch(alpha, beta, not isMax, lastMoveSpecial)
-            return None, evaluation.evaluate(self.board, isMax)
-        
-        if isMax:
-            bestValue = float('-inf')
-        else:
-            bestValue = float('inf')
-        bestMove = None
-        moves = sorted(list(self.board.legal_moves), 
-                       key=lambda move: (self.board.piece_at(move.to_square) 
-                        is None, move.from_square, move.to_square))
-        for move in moves:
-            isSpecial = self.board.is_capture(move)
-            self.board.push_uci(move.uci())
-            isSpecial = isSpecial or self.board.is_check()
-            _, value = self.alphaBeta(depth - 1, alpha, beta, not isMax, isSpecial)
-            self.board.pop()
-            if isMax:
-                if bestValue <= value:
-                    bestValue = value
-                    bestMove = move
-                alpha = max(alpha, bestValue)
-            else:
-                if bestValue >= value:
-                    bestValue = value
-                    bestMove = move
-                beta = min(beta, bestValue)
-            if beta <= alpha:
-                return bestMove, bestValue
-        return bestMove, bestValue
+    bestValue = float('-inf')
+    bestMove = None
+    for move in moves:
+        board.push(move)
+        value = -alphaBeta(depth - 1, float('-inf'), float('inf'), board)
+        board.pop()
+        if value >= bestValue:
+            bestValue = value
+            bestMove = move
 
-    def qSearch(self, alpha: float, beta: float, isMax: bool, lastMoveSpecial: bool):
-        if not lastMoveSpecial:
-            return None, evaluation.evaluate(self.board, isMax)
-        if isMax:
-            bestValue = float('-inf')
-        else:
-            bestValue = float('inf')
-        bestMove = None
-        for move in self.board.legal_moves:
-            isSpecial = self.board.is_capture(move)
-            self.board.push_uci(move.uci())
-            isSpecial = isSpecial or self.board.is_check()
-            _, value = self.qSearch(alpha, beta, not isMax, isSpecial)
-            self.board.pop()
-            if isMax:
-                if bestValue <= value:
-                    bestValue = value
-                    bestMove = move
-                alpha = max(alpha, bestValue)
-            else:
-                if bestValue >= value:
-                    bestValue = value
-                    bestMove = move
-                beta = min(beta, bestValue)
-            if beta <= alpha:
-                return bestMove, bestValue
-        return bestMove, bestValue
+    return bestMove, bestValue
+
+def getNewBoard(board, move):
+    newBoard = board.copy()
+    newBoard.push(move)
+    return newBoard
+
+def alphaBeta(depth: int, alpha: float, beta: float, board: chess.Board) -> float:
+    if board.is_checkmate():
+        return float('-inf')
+    moves = getOrderedMoves(onlyCaptures=False, board=board)
+    if not moves:
+        return 0
+    if depth == 0:
+        return qSearch(alpha, beta, board)
+    
+    for move in moves:
+        board.push(move)
+        value = -alphaBeta(depth - 1, -beta, -alpha, board)
+        board.pop()
+        if value >= beta:
+            return beta
+        alpha = max(alpha, value)
+    
+    return alpha
+    
+def qSearch(alpha: float, beta: float, board: chess.Board):
+    value = evaluation.evaluate(board)
+    if value >= beta:
+        return beta
+    return value
+    alpha = max(alpha, value)
+    moves = getOrderedMoves(onlyCaptures=True)
+    for move in moves:
+        board.push(move)
+        value = -qSearch( -beta, -alpha, board)
+        board.pop()
+        if value >= beta:
+            return beta
+        alpha = max(alpha, value)
+    
+    return alpha
+
+def getOrderedMoves(onlyCaptures, board: chess.Board):
+    if onlyCaptures:
+        return sorted([move for move in board.legal_moves if board.is_capture(move)], key=lambda move: getMovePriority(move))
+    return sorted(list(board.legal_moves), key=lambda move: getMovePriority(move, board))
+
+def getMovePriority(move: chess.Move, board: chess.Board) -> int:
+    if board.piece_at(move.to_square) is None: 
+        return 0
+    else: 
+        return evaluation.pieceValue[board.piece_at(move.to_square).symbol().upper()]

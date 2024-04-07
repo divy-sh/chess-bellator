@@ -1,6 +1,8 @@
 import chess
+import torch
+import numpy as np
 
-pieceValue = {'rook': 500, 'pawn' : 100, 'bishop': 300, 'knight' : 300, 'queen': 900, 'king': 10000}
+pieceValue = {'R': 500, 'P' : 100, 'B': 300, 'N' : 300, 'Q': 900, 'K': 10000}
 
 pawn_table = [
     0,  0,  0,  0,  0,  0,  0,  0,
@@ -86,79 +88,124 @@ king_end_game_table = [
 ]
 rev_king_end_game_table = list(reversed(king_end_game_table))
 
-def evaluate(board: chess.Board, isMax: bool) -> float:
-        value = 0
-        material_value = 0
-        positional_value = 0
-        for square, piece in board.piece_map().items():
-            if piece.color == chess.WHITE:
-                material_value += pieceValue[chess.piece_name(piece.piece_type)]
-                positional_value += get_piece_square_table(board, piece.piece_type, square, chess.WHITE)
-            else:
-                material_value -= pieceValue[chess.piece_name(piece.piece_type)]
-                positional_value -= get_piece_square_table(board, piece.piece_type, square, chess.BLACK)
+# pieceMap = dict(chess.Square, chess.Piece)
+
+# def evaluate(board: chess.Board) -> float:
+#         value = 0
+#         material_value = 0
+#         positional_value = 0
+#         pieceMap = board.piece_map().items()
+#         for square, piece in pieceMap:
+#             if piece.color == chess.WHITE:
+#                 material_value += pieceValue[chess.piece_symbol(piece.piece_type).upper()]
+#                 positional_value += get_piece_square_table(board, piece.piece_type, square, chess.WHITE)
+#             else:
+#                 material_value -= pieceValue[chess.piece_symbol(piece.piece_type).upper()]
+#                 positional_value -= get_piece_square_table(board, piece.piece_type, square, chess.BLACK)
         
-        mobility_value = 0
-        for square in chess.SQUARES:
-            if board.is_attacked_by(chess.WHITE, square):
-                mobility_value += 50
+#         mobility_value = 0
+#         for square in chess.SQUARES:
+#             if board.is_attacked_by(chess.WHITE, square):
+#                 mobility_value += 50
 
-            if board.is_attacked_by(chess.BLACK, square):
-                mobility_value -= 50
+#             if board.is_attacked_by(chess.BLACK, square):
+#                 mobility_value -= 50
         
-        center_squares = [chess.E4, chess.D4, chess.E5, chess.D5]
-        center_control_value = 0
-        for square in center_squares:
-            piece = board.piece_at(square)
-            if piece is not None:
-                if piece.color == chess.WHITE:
-                    center_control_value += 50
-                else:
-                    center_control_value -= 50
+#         center_squares = [chess.E4, chess.D4, chess.E5, chess.D5]
+#         center_control_value = 0
+#         for square in center_squares:
+#             piece = board.piece_at(square)
+#             if piece is not None:
+#                 if piece.color == chess.WHITE:
+#                     center_control_value += 50
+#                 else:
+#                     center_control_value -= 50
         
-        value = material_value + positional_value + mobility_value + center_control_value
-        game_phase = get_game_phase(board)
-        value = value * game_phase + (1 - game_phase) * material_value
-        return value
+#         value = material_value + positional_value + mobility_value + center_control_value
+#         game_phase = get_game_phase(board)
+#         value = value * game_phase + (1 - game_phase) * material_value
+#         return value
 
-def get_piece_square_table(board: chess.Board, piece_type: chess.PieceType, square: chess.Square, color: chess.Color) -> float:
-    # Define piece-square tables for both colors
-    # Flip the table based on the color
-    if color == chess.BLACK:
-        pt = rev_pawn_table
-        kt = rev_knight_table
-        bt = rev_bishop_table
-        rt = rev_rook_table
-        qt = rev_queen_table
-        kmt = rev_king_middle_game_table
-        ket = rev_king_end_game_table
-    else:
-        pt = pawn_table
-        kt = knight_table
-        bt = bishop_table
-        rt = rook_table
-        qt = queen_table
-        kmt = king_middle_game_table
-        ket = king_end_game_table
+# def get_piece_square_table(board: chess.Board, piece_type: chess.PieceType, square: chess.Square, color: chess.Color) -> float:
+#     # Define piece-square tables for both colors
+#     # Flip the table based on the color
+#     if color == chess.BLACK:
+#         pt = rev_pawn_table
+#         kt = rev_knight_table
+#         bt = rev_bishop_table
+#         rt = rev_rook_table
+#         qt = rev_queen_table
+#         kmt = rev_king_middle_game_table
+#         ket = rev_king_end_game_table
+#     else:
+#         pt = pawn_table
+#         kt = knight_table
+#         bt = bishop_table
+#         rt = rook_table
+#         qt = queen_table
+#         kmt = king_middle_game_table
+#         ket = king_end_game_table
 
-    # Return the corresponding table for the given piece type
-    if piece_type == chess.PAWN:
-        return pt[square]
-    elif piece_type == chess.KNIGHT:
-        return kt[square]
-    elif piece_type == chess.BISHOP:
-        return bt[square]
-    elif piece_type == chess.ROOK:
-        return rt[square]
-    elif piece_type == chess.QUEEN:
-        return qt[square]
-    elif piece_type == chess.KING:
-        # Use a weighted average of the middle game and end game tables
-        game_phase = get_game_phase(board)
-        return game_phase * kmt[square] + (1 - game_phase) * ket[square]
+#     # Return the corresponding table for the given piece type
+#     if piece_type == chess.PAWN:
+#         return pt[square]
+#     elif piece_type == chess.KNIGHT:
+#         return kt[square]
+#     elif piece_type == chess.BISHOP:
+#         return bt[square]
+#     elif piece_type == chess.ROOK:
+#         return rt[square]
+#     elif piece_type == chess.QUEEN:
+#         return qt[square]
+#     elif piece_type == chess.KING:
+#         # Use a weighted average of the middle game and end game tables
+#         game_phase = get_game_phase()
+#         return game_phase * kmt[square] + (1 - game_phase) * ket[square]
 
-def get_game_phase(board: chess.Board):
-    total_pieces = sum(1 for _ in board.occupied_co)
-    max_pieces = 32  # Maximum number of pieces at the start of the game
-    game_phase = total_pieces / max_pieces
-    return game_phase
+# def get_game_phase():
+#     minor_pieces = 0
+#     queens = 0
+#     for _, piece in pieceMap:
+#         if piece.piece_type == chess.BISHOP or piece.piece_type == chess.BISHOP:
+#             minor_pieces += 1
+#         elif piece.piece_type == chess.QUEEN:
+#             queens += 1
+#     return minor_pieces < 2 or queens == 0
+
+
+def evaluate(board: chess.Board):
+    model = torch.jit.load('model_scripted.pt')
+    # device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
+    # model.to(device)
+    model.eval()
+    # x = torch.tensor(fen_to_features(board.fen()), device=device)
+    x = torch.tensor(fen_to_features(board.fen()))
+    with torch.no_grad():
+        y_hat_eval = model(x)
+    if board.turn == chess.BLACK:
+        y_hat_eval = -y_hat_eval
+    return y_hat_eval
+
+def fen_to_features(fen):
+    piece_to_index = {'r': 0, 'n': 1, 'b': 2, 'q': 3, 'k': 4, 'p': 5,
+                      'R': 6, 'N': 7, 'B': 8, 'Q': 9, 'K': 10, 'P': 11}
+
+    one_hot_board = np.zeros((8, 8, 12), dtype=np.float32)
+    additional_features = np.zeros(14, dtype=np.float32)
+
+    fen_rows = fen.split()[0].split('/')
+    for row_idx, row in enumerate(fen_rows):
+        col_idx = 0
+        for char in row:
+            if char.isdigit():
+                col_idx += int(char)
+            elif char in piece_to_index:
+                piece_idx = piece_to_index[char]
+                one_hot_board[row_idx, col_idx, piece_idx] = 1
+                col_idx += 1
+    additional_features[0] = 1 if fen[1] == 'w' else 0
+    additional_features[1:5] = [int(right in fen[2]) for right in ['K', 'Q', 'k', 'q']]
+    if fen.split()[3] != '-':
+        en_passant_row = ord(fen.split()[3][0]) - ord('a')
+        additional_features[6 + en_passant_row] = 1
+    return np.concatenate([one_hot_board.flatten(), additional_features])

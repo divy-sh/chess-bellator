@@ -1,6 +1,6 @@
 from view import View
 from game import Game
-from engine import Engine
+import engine
 import random
 import math
 import time
@@ -8,7 +8,6 @@ import time
 def main():
     game = Game()
     view = View(game.getBoard())
-    engine = Engine(game.getBoard())
     AIvsAI(game, engine, view)
     # playerVsAI(game, engine, view)
     
@@ -19,10 +18,10 @@ def AIvsAI(game, engine, view):
             print(game.outcome())
             return
         start_time = time.time()
-        move = engine.genMoveIterative(1)
-        game.playMove(move)
+        move, eval = engine.genMove(3, game.getBoard())
+        game.playMove(move.uci())
         view.update()
-        print(f"Time taken to run: {time.time() - start_time:.6f} seconds")
+        print(f"move - {move.uci()}, eval - {eval}, Time taken to run: {time.time() - start_time:.6f} seconds")
         
 def playerVsAI(game, engine, view):
     playerWhite = math.ceil(random.random() * 100) % 2 == 0
@@ -38,10 +37,10 @@ def playerVsAI(game, engine, view):
                 playerWhite = not playerWhite
         else:
             start_time = time.time()
-            move = engine.genMoveIterative(1)
+            move, eval = engine.genMove(3, game.getBoard())
             game.playMove(move)
             view.update()
-            print(f"Time taken to run: {time.time() - start_time:.6f} seconds")
+            print(f"move - {move.uci()}, eval - {eval}, Time taken to run: {time.time() - start_time:.6f} seconds")
         playerWhite = not playerWhite
 
 if __name__ == '__main__':
