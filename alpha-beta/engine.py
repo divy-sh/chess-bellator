@@ -2,7 +2,8 @@ import chess
 import chess.engine
 import time
 import eval as evaluation
-from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
+from functools import partial
 
 
 def genMoveIterative(seconds: float, board: chess.Board) -> str:    
@@ -23,22 +24,26 @@ def genMove(depth: int, board: chess.Board) -> str:
     if not moves:
         return None, 0
     
+    pool = multiprocessing.Pool()
+    eval = partial(evaluate_move, depth, board.copy())
+    results = pool.map(eval, moves)
+    pool.close()
+    pool.join()
+
     bestValue = float('-inf')
     bestMove = None
-    for move in moves:
-        board.push(move)
-        value = -alphaBeta(depth - 1, float('-inf'), float('inf'), board)
-        board.pop()
+    for move, value in results:
         if value >= bestValue:
             bestValue = value
             bestMove = move
 
     return bestMove, bestValue
 
-def getNewBoard(board, move):
-    newBoard = board.copy()
-    newBoard.push(move)
-    return newBoard
+def evaluate_move(depth: int, board: chess.Board, move: chess.Move) -> tuple:
+    board.push(move)
+    value = -alphaBeta(depth - 1, float('-inf'), float('inf'), board)
+    board.pop()
+    return move, value
 
 def alphaBeta(depth: int, alpha: float, beta: float, board: chess.Board) -> float:
     if board.is_checkmate():
