@@ -17,11 +17,12 @@ def genMoveIterative(seconds: float, board: chess.Board) -> str:
 
 # generate move with fixed depth alpha-beta search
 def genMove(depth: int, board: chess.Board) -> str:
-    if board.is_checkmate():
-        return None, float('-inf')
     moves = getOrderedMoves(onlyCaptures=False, board=board)
+
     if not moves:
         return None, 0
+    if board.is_checkmate() or board.is_fifty_moves() or board.is_fivefold_repetition():
+        return None, float('-inf')
     
     pool = multiprocessing.Pool()
     eval = partial(evaluate_move, depth, board.copy())
@@ -32,10 +33,10 @@ def genMove(depth: int, board: chess.Board) -> str:
     bestValue = float('-inf')
     bestMove = None
     for move, value in results:
+        print(move, value)
         if value >= bestValue:
             bestValue = value
             bestMove = move
-
     return bestMove, bestValue
 
 def evaluate_move(depth: int, board: chess.Board, move: chess.Move) -> tuple:
@@ -45,7 +46,7 @@ def evaluate_move(depth: int, board: chess.Board, move: chess.Move) -> tuple:
     return move, value
 
 def alphaBeta(depth: int, alpha: float, beta: float, board: chess.Board) -> float:
-    if board.is_checkmate():
+    if board.is_checkmate() or board.is_fifty_moves() or board.is_fivefold_repetition():
         return float('-inf')
     moves = board.legal_moves
     if not moves:
