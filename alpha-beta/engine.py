@@ -33,7 +33,6 @@ def genMove(depth: int, board: chess.Board) -> str:
     bestValue = float('-inf')
     bestMove = None
     for move, value in results:
-        print(move, value)
         if value >= bestValue:
             bestValue = value
             bestMove = move

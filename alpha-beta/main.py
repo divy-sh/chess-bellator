@@ -12,13 +12,16 @@ def main():
     playerVsAI(game, engine, view)
     
 def AIvsAI(game, engine, view):
+    pgn = []
     while True:
         if game.gameOver():
             print("game over!")
             print(game.outcome())
+            print(', '.join(pgn))
             return
         start_time = time.time()
         move, eval = engine.genMove(4, game.getBoard())
+        pgn.append(game.getBoard().san(move))
         game.playMove(move.uci())
         view.update()
         print(f"move - {move.uci()}, eval - {eval}, Time taken to run: {time.time() - start_time:.6f} seconds")
