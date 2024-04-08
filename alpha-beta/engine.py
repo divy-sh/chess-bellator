@@ -1,10 +1,9 @@
-import chess
-import chess.engine
 import time
-import eval as evaluation
 import multiprocessing
 from functools import partial
 
+import chess
+import eval
 
 def genMoveIterative(seconds: float, board: chess.Board) -> str:    
     timeout = time.time() + seconds
@@ -48,7 +47,7 @@ def evaluate_move(depth: int, board: chess.Board, move: chess.Move) -> tuple:
 def alphaBeta(depth: int, alpha: float, beta: float, board: chess.Board) -> float:
     if board.is_checkmate():
         return float('-inf')
-    moves = getOrderedMoves(onlyCaptures=False, board=board)
+    moves = board.legal_moves
     if not moves:
         return 0
     if depth == 0:
@@ -65,29 +64,26 @@ def alphaBeta(depth: int, alpha: float, beta: float, board: chess.Board) -> floa
     return alpha
     
 def qSearch(alpha: float, beta: float, board: chess.Board):
-    value = evaluation.evaluate(board)
+    value = eval.evaluate(board)
     if value >= beta:
         return beta
     return value
-    alpha = max(alpha, value)
-    moves = getOrderedMoves(onlyCaptures=True)
-    for move in moves:
-        board.push(move)
-        value = -qSearch( -beta, -alpha, board)
-        board.pop()
-        if value >= beta:
-            return beta
-        alpha = max(alpha, value)
+    # alpha = max(alpha, value)
+    # moves = board.legal_moves
+    # for move in moves:
+    #     board.push(move)
+    #     value = -qSearch( -beta, -alpha, board)
+    #     board.pop()
+    #     if value >= beta:
+    #         return beta
+    #     alpha = max(alpha, value)
     
-    return alpha
+    # return alpha
 
 def getOrderedMoves(onlyCaptures, board: chess.Board):
     if onlyCaptures:
-        return sorted([move for move in board.legal_moves if board.is_capture(move)], key=lambda move: getMovePriority(move))
+        return sorted([move for move in board.legal_moves if board.is_capture(move)], key=lambda move: getMovePriority(move, board))
     return sorted(list(board.legal_moves), key=lambda move: getMovePriority(move, board))
 
 def getMovePriority(move: chess.Move, board: chess.Board) -> int:
-    if board.piece_at(move.to_square) is None: 
-        return 0
-    else: 
-        return evaluation.pieceValue[board.piece_at(move.to_square).symbol().upper()]
+    return eval.evaluateMove(move, board)

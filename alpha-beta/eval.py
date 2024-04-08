@@ -1,190 +1,79 @@
 import chess
 import torch
 import numpy as np
+import consts
 
-pieceValue = {'R': 500, 'P' : 100, 'B': 300, 'N' : 300, 'Q': 900, 'K': 10000}
+endGame = False
 
-pawn_table = [
-    0,  0,  0,  0,  0,  0,  0,  0,
-    50, 50, 50, 50, 50, 50, 50, 50,
-    10, 10, 20, 30, 30, 20, 10, 10,
-    5,  5, 10, 25, 25, 10,  5,  5,
-    0,  0,  0, 20, 20,  0,  0,  0,
-    5, -5,-10,  0,  0,-10, -5,  5,
-    5, 10, 10,-20,-20, 10, 10,  5,
-    0,  0,  0,  0,  0,  0,  0,  0
-]
-rev_pawn_table = list(reversed(pawn_table))
+def getPositionalValue(sq: chess.Square, pc: chess.Piece, endGame: bool) -> float:
+    if pc.color == chess.BLACK:
+        sq ^= 56
+    if pc.piece_type == chess.KING:
+        if endGame:
+            return consts.king_end_game_table[sq]
+        else:
+            return consts.king_middle_game_table[sq]
+    return consts.piecePositionalScore[pc.piece_type][sq]
 
-knight_table = [
-    -50,-40,-30,-30,-30,-30,-40,-50,
-    -40,-20,  0,  0,  0,  0,-20,-40,
-    -30,  0, 10, 15, 15, 10,  0,-30,
-    -30,  5, 15, 20, 20, 15,  5,-30,
-    -30,  0, 15, 20, 20, 15,  0,-30,
-    -30,  5, 10, 15, 15, 10,  5,-30,
-    -40,-20,  0,  5,  5,  0,-20,-40,
-    -50,-40,-30,-30,-30,-30,-40,-50
-]
-rev_knight_table = list(reversed(knight_table))
+def get_game_phase(pieceMap):
+    minor_pieces = 0
+    queens = 0
+    for _, piece in pieceMap:
+        if piece.piece_type == chess.BISHOP or piece.piece_type == chess.BISHOP:
+            minor_pieces += 1
+        elif piece.piece_type == chess.QUEEN:
+            queens += 1
+    return minor_pieces < 2 or queens == 0
 
-bishop_table = [
-    -20,-10,-10,-10,-10,-10,-10,-20,
-    -10,  0,  0,  0,  0,  0,  0,-10,
-    -10,  0,  5, 10, 10,  5,  0,-10,
-    -10,  5,  5, 10, 10,  5,  5,-10,
-    -10,  0, 10, 10, 10, 10,  0,-10,
-    -10, 10, 10, 10, 10, 10, 10,-10,
-    -10,  5,  0,  0,  0,  0,  5,-10,
-    -20,-10,-10,-10,-10,-10,-10,-20
-]
-rev_bishop_table = list(reversed(bishop_table))
-
-rook_table = [
-    0,  0,  0,  0,  0,  0,  0,  0,
-    5, 10, 10, 10, 10, 10, 10,  5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    0,  0,  0,  5,  5,  0,  0,  0
-]
-rev_rook_table = list(reversed(rook_table))
-
-queen_table = [
-    -20,-10,-10, -5, -5,-10,-10,-20,
-    -10,  0,  0,  0,  0,  0,  0,-10,
-    -10,  0,  5,  5,  5,  5,  0,-10,
-    -5,  0,  5,  5,  5,  5,  0, -5,
-    0,  0,  5,  5,  5,  5,  0, -5,
-    -10,  5,  5,  5,  5,  5,  0,-10,
-    -10,  0,  5,  0,  0,  0,  0,-10,
-    -20,-10,-10, -5, -5,-10,-10,-20
-]
-rev_queen_table = list(reversed(queen_table))
-
-king_middle_game_table = [
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -20,-30,-30,-40,-40,-30,-30,-20,
-    -10,-20,-20,-20,-20,-20,-20,-10,
-    20, 20,  0,  0,  0,  0, 20, 20,
-    20, 30, 10,  0,  0, 10, 30, 20
-]
-rev_king_middle_game_table = list(reversed(king_middle_game_table))
-
-king_end_game_table = [
-    -50,-40,-30,-20,-20,-30,-40,-50,
-    -30,-20,-10,  0,  0,-10,-20,-30,
-    -30,-10, 20, 30, 30, 20,-10,-30,
-    -30,-10, 30, 40, 40, 30,-10,-30,
-    -30,-10, 30, 40, 40, 30,-10,-30,
-    -30,-10, 20, 30, 30, 20,-10,-30,
-    -30,-30,  0,  0,  0,  0,-30,-30,
-    -50,-30,-30,-30,-30,-30,-30,-50
-]
-rev_king_end_game_table = list(reversed(king_end_game_table))
-
-# pieceMap = dict(chess.Square, chess.Piece)
-
-# def evaluate(board: chess.Board) -> float:
-#         value = 0
-#         material_value = 0
-#         positional_value = 0
-#         pieceMap = board.piece_map().items()
-#         for square, piece in pieceMap:
-#             if piece.color == chess.WHITE:
-#                 material_value += pieceValue[chess.piece_symbol(piece.piece_type).upper()]
-#                 positional_value += get_piece_square_table(board, piece.piece_type, square, chess.WHITE)
-#             else:
-#                 material_value -= pieceValue[chess.piece_symbol(piece.piece_type).upper()]
-#                 positional_value -= get_piece_square_table(board, piece.piece_type, square, chess.BLACK)
-        
-#         mobility_value = 0
-#         for square in chess.SQUARES:
-#             if board.is_attacked_by(chess.WHITE, square):
-#                 mobility_value += 50
-
-#             if board.is_attacked_by(chess.BLACK, square):
-#                 mobility_value -= 50
-        
-#         center_squares = [chess.E4, chess.D4, chess.E5, chess.D5]
-#         center_control_value = 0
-#         for square in center_squares:
-#             piece = board.piece_at(square)
-#             if piece is not None:
-#                 if piece.color == chess.WHITE:
-#                     center_control_value += 50
-#                 else:
-#                     center_control_value -= 50
-        
-#         value = material_value + positional_value + mobility_value + center_control_value
-#         game_phase = get_game_phase(board)
-#         value = value * game_phase + (1 - game_phase) * material_value
-#         return value
-
-# def get_piece_square_table(board: chess.Board, piece_type: chess.PieceType, square: chess.Square, color: chess.Color) -> float:
-#     # Define piece-square tables for both colors
-#     # Flip the table based on the color
-#     if color == chess.BLACK:
-#         pt = rev_pawn_table
-#         kt = rev_knight_table
-#         bt = rev_bishop_table
-#         rt = rev_rook_table
-#         qt = rev_queen_table
-#         kmt = rev_king_middle_game_table
-#         ket = rev_king_end_game_table
-#     else:
-#         pt = pawn_table
-#         kt = knight_table
-#         bt = bishop_table
-#         rt = rook_table
-#         qt = queen_table
-#         kmt = king_middle_game_table
-#         ket = king_end_game_table
-
-#     # Return the corresponding table for the given piece type
-#     if piece_type == chess.PAWN:
-#         return pt[square]
-#     elif piece_type == chess.KNIGHT:
-#         return kt[square]
-#     elif piece_type == chess.BISHOP:
-#         return bt[square]
-#     elif piece_type == chess.ROOK:
-#         return rt[square]
-#     elif piece_type == chess.QUEEN:
-#         return qt[square]
-#     elif piece_type == chess.KING:
-#         # Use a weighted average of the middle game and end game tables
-#         game_phase = get_game_phase()
-#         return game_phase * kmt[square] + (1 - game_phase) * ket[square]
-
-# def get_game_phase():
-#     minor_pieces = 0
-#     queens = 0
-#     for _, piece in pieceMap:
-#         if piece.piece_type == chess.BISHOP or piece.piece_type == chess.BISHOP:
-#             minor_pieces += 1
-#         elif piece.piece_type == chess.QUEEN:
-#             queens += 1
-#     return minor_pieces < 2 or queens == 0
-
-
-def evaluate(board: chess.Board):
-    model = torch.jit.load('model_scripted.pt')
-    # device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
-    # model.to(device)
-    model.eval()
-    # x = torch.tensor(fen_to_features(board.fen()), device=device)
-    x = torch.tensor(fen_to_features(board.fen()))
-    with torch.no_grad():
-        y_hat_eval = model(x)
+def evaluateMove(mv: chess.Move, board: chess.Board):
+    white = 1
     if board.turn == chess.BLACK:
-        y_hat_eval = -y_hat_eval
-    return y_hat_eval
+        white = -1
+    matDiff = 0
+    if mv.promotion:
+        return float('inf') * white
+    pc = board.piece_at(mv.from_square)
+    posChange = getPositionalValue(mv.to_square, pc, endGame) - getPositionalValue(mv.from_square, pc, endGame)
+    if board.is_capture(mv):
+        matDiff = evalCapture(mv, board)
+    val = posChange + matDiff
+    return val * white
+ 
+def evalCapture(mv: chess.Move, board: chess.Board):
+    if board.is_en_passant(mv):
+        return consts.pieceValue[chess.PAWN]
+    return consts.pieceValue[board.piece_at(mv.to_square).piece_type] - consts.pieceValue[board.piece_at(mv.from_square).piece_type]
+
+def evalPiece(sq: chess.Square, pc: chess.Piece, endGame: bool) -> float:
+    return getPositionalValue(sq, pc, endGame) + consts.pieceValue[pc.piece_type]
+
+def evaluate(board: chess.Board) -> float:
+    pieceMap = board.piece_map().items()
+    global endGame
+    if endGame == False:
+        endGame = get_game_phase(pieceMap)
+    white = 1
+    score = 0
+    if board.turn == chess.BLACK:
+        white = -1
+    
+    for sq, pc in pieceMap:
+        eval = evalPiece(sq, pc, endGame)
+        if pc.color == chess.WHITE:
+            score += eval
+        else:
+            score -= eval
+    return score * white
+
+# def evaluate(board: chess.Board):
+#     model = torch.jit.load('scripted.pt')
+#     model.eval()
+#     x = torch.tensor(fen_to_features(board.fen()))
+#     with torch.no_grad():
+#         y_hat_eval = model(x).squeeze()
+#     if board.turn == chess.BLACK:
+#         y_hat_eval = -y_hat_eval
+#     return y_hat_eval
 
 def fen_to_features(fen):
     piece_to_index = {'r': 0, 'n': 1, 'b': 2, 'q': 3, 'k': 4, 'p': 5,

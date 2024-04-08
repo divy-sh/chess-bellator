@@ -9,7 +9,7 @@ def main():
     game = Game()
     view = View(game.getBoard())
     AIvsAI(game, engine, view)
-    # playerVsAI(game, engine, view)
+    playerVsAI(game, engine, view)
     
 def AIvsAI(game, engine, view):
     while True:
@@ -18,7 +18,7 @@ def AIvsAI(game, engine, view):
             print(game.outcome())
             return
         start_time = time.time()
-        move, eval = engine.genMove(3, game.getBoard())
+        move, eval = engine.genMove(4, game.getBoard())
         game.playMove(move.uci())
         view.update()
         print(f"move - {move.uci()}, eval - {eval}, Time taken to run: {time.time() - start_time:.6f} seconds")
@@ -37,7 +37,7 @@ def playerVsAI(game, engine, view):
                 playerWhite = not playerWhite
         else:
             start_time = time.time()
-            move, eval = engine.genMove(3, game.getBoard())
+            move, eval = engine.genMove(4, game.getBoard())
             game.playMove(move)
             view.update()
             print(f"move - {move.uci()}, eval - {eval}, Time taken to run: {time.time() - start_time:.6f} seconds")
