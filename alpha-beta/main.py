@@ -17,7 +17,7 @@ def AIvsAI(game, engine, view):
         if game.gameOver():
             print("game over!")
             print(game.outcome())
-            print(', '.join(pgn))
+            print(' '.join(pgn))
             return
         start_time = time.time()
         move, eval = engine.genMove(4, game.getBoard())
