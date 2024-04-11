@@ -8,7 +8,7 @@ import time
 def main():
     game = Game()
     view = View(game.getBoard())
-    AIvsAI(game, engine, view)
+    # AIvsAI(game, engine, view)
     playerVsAI(game, engine, view)
     
 def AIvsAI(game, engine, view):
@@ -28,6 +28,7 @@ def AIvsAI(game, engine, view):
         
 def playerVsAI(game, engine, view):
     playerWhite = math.ceil(random.random() * 100) % 2 == 0
+    playerWhite = True
     while True:
         if game.gameOver():
             print("game over!")
@@ -35,7 +36,7 @@ def playerVsAI(game, engine, view):
             return
         if playerWhite:
             move = input("your move: ")
-            if not game.playMove(move):
+            if not game.playMove(move.uci()):
                 print("invalid move, try again")
                 playerWhite = not playerWhite
         else:
