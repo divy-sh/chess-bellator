@@ -88,7 +88,4 @@ def qSearch(alpha: float, beta: float, board: chess.Board):
 def getOrderedMoves(onlyCaptures, board: chess.Board):
     if onlyCaptures:
         return sorted([move for move in board.legal_moves if board.is_capture(move)], key=lambda move: getMovePriority(move, board))
-    return sorted(list(board.legal_moves), key=lambda move: getMovePriority(move, board))
-
-def getMovePriority(move: chess.Move, board: chess.Board) -> int:
-    return eval.evaluateMove(move, board)
+    return sorted(list(board.legal_moves), key=lambda move: eval.evaluateMove(move, board))
