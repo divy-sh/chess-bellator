@@ -36,13 +36,13 @@ def playerVsAI(game, engine, view):
             return
         if playerWhite:
             move = input("your move: ")
-            if not game.playMove(move.uci()):
+            if not game.playMove(move):
                 print("invalid move, try again")
                 playerWhite = not playerWhite
         else:
             start_time = time.time()
             move, eval = engine.genMove(4, game.getBoard())
-            game.playMove(move)
+            game.playMove(move.uci())
             view.update()
             print(f"move - {move.uci()}, eval - {eval}, Time taken to run: {time.time() - start_time:.6f} seconds")
         playerWhite = not playerWhite
