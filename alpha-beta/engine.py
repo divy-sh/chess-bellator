@@ -35,8 +35,6 @@ def genMove(depth: int, board: chess.Board) -> str:
         if value >= bestValue:
             bestValue = value
             bestMove = move
-            value = None
-            move = None
     return bestMove, bestValue
 
 def evaluate_move(depth: int, board: chess.Board, move: chess.Move) -> tuple:
@@ -56,12 +54,13 @@ def alphaBeta(depth: int, alpha: float, beta: float, board: chess.Board) -> floa
     if depth == 0:
         return qSearch(alpha, beta, board)
     
+    firstChild = True
+    chValue = float('-inf')
     for move in moves:
         board.push(move)
         value = -alphaBeta(depth - 1, -beta, -alpha, board)
         board.pop()
         if value >= beta:
-            value = None
             return beta
         alpha = max(alpha, value)
     
@@ -70,7 +69,6 @@ def alphaBeta(depth: int, alpha: float, beta: float, board: chess.Board) -> floa
 def qSearch(alpha: float, beta: float, board: chess.Board):
     value = eval.evaluate(board)
     if value >= beta:
-        value = None
         return beta
     return value
     # alpha = max(alpha, value)
