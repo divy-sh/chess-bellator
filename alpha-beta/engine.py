@@ -39,11 +39,11 @@ def genMove(depth: int, board: chess.Board) -> str:
 
 def evaluate_move(depth: int, board: chess.Board, move: chess.Move) -> tuple:
     board.push(move)
-    value = -alphaBeta(depth - 1, float('-inf'), float('inf'), board)
+    value = -negaMax(depth - 1, float('-inf'), float('inf'), board)
     board.pop()
     return move, value
 
-def alphaBeta(depth: int, alpha: float, beta: float, board: chess.Board) -> float:
+def negaMax(depth: int, alpha: float, beta: float, board: chess.Board) -> float:
     if board.is_checkmate():
         return -100000 * (depth + 1)
     if board.can_claim_draw():
@@ -58,8 +58,10 @@ def alphaBeta(depth: int, alpha: float, beta: float, board: chess.Board) -> floa
     chValue = float('-inf')
     for move in moves:
         board.push(move)
-        value = -alphaBeta(depth - 1, -beta, -alpha, board)
+        value = -negaMax(depth - 1, -beta, -alpha, board)
         board.pop()
+
+
         if value >= beta:
             return beta
         alpha = max(alpha, value)
