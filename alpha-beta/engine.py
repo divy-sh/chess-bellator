@@ -11,7 +11,7 @@ def genMoveIterative(seconds: float, board: chess.Board) -> str:
     move = None
     while time.time() < timeout:
         depth += 1
-        move = genMove(depth)
+        move = genMove(depth, board)
     print(f"depth reached - {depth}")
     return move
 
