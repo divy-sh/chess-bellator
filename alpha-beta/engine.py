@@ -54,14 +54,10 @@ def negaMax(depth: int, alpha: float, beta: float, board: chess.Board) -> float:
     if depth == 0:
         return qSearch(alpha, beta, board)
     
-    firstChild = True
-    chValue = float('-inf')
     for move in moves:
         board.push(move)
         value = -negaMax(depth - 1, -beta, -alpha, board)
         board.pop()
-
-
         if value >= beta:
             return beta
         alpha = max(alpha, value)
