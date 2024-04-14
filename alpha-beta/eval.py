@@ -1,3 +1,4 @@
+from typing import Iterator
 import chess
 import torch
 import numpy as np
@@ -15,16 +16,11 @@ def getPositionalValue(sq: chess.Square, pc: chess.Piece, endGame: bool) -> floa
             return consts.king_middle_game_table[sq]
     return consts.piecePositionalScore[pc.piece_type][sq]
 
-def get_game_phase(pieceMap):
-    minor_pieces = 0
-    queens = 0
-    for _, piece in pieceMap:
-        if piece.piece_type == chess.BISHOP or piece.piece_type == chess.BISHOP:
-            minor_pieces += 1
-        elif piece.piece_type == chess.QUEEN:
-            queens += 1
-    return minor_pieces < 2 or queens == 0
-
+def get_game_phase(board: chess.Board):
+    minorPieces = bin(board.bishops | board.knights).count('1')
+    queens = bin(board.queens).count('1')
+    return minorPieces < 2 or queens == 0
+    
 def evaluateMove(mv: chess.Move, board: chess.Board):
     white = 1
     if board.turn == chess.BLACK:
@@ -48,22 +44,27 @@ def evalPiece(sq: chess.Square, pc: chess.Piece, endGame: bool) -> float:
     return getPositionalValue(sq, pc, endGame) + consts.pieceValue[pc.piece_type]
 
 def evaluate(board: chess.Board) -> float:
-    pieceMap = board.piece_map().items()
     global endGame
     if endGame == False:
-        endGame = get_game_phase(pieceMap)
+        endGame = get_game_phase(board)
     white = 1
     score = 0
     if board.turn == chess.BLACK:
         white = -1
-    
-    for sq, pc in pieceMap:
+    for sq in scan(board.occupied):
+        pc = board.piece_at(sq)
         eval = evalPiece(sq, pc, endGame)
         if pc.color == chess.WHITE:
             score += eval
         else:
             score -= eval
     return score * white
+
+def scan(bb: chess.Bitboard) -> Iterator[chess.Square]:
+    while bb:
+        r = bb.bit_length() - 1
+        yield r
+        bb ^= chess.BB_SQUARES[r]
 
 # def evaluate(board: chess.Board):
 #     model = torch.jit.load('scripted.pt')
