@@ -68,20 +68,19 @@ def qSearch(alpha: float, beta: float, board: chess.Board):
     value = eval.evaluate(board)
     if value >= beta:
         return beta
-    return value
-    # alpha = max(alpha, value)
-    # moves = board.legal_moves
-    # for move in moves:
-    #     board.push(move)
-    #     value = -qSearch( -beta, -alpha, board)
-    #     board.pop()
-    #     if value >= beta:
-    #         return beta
-    #     alpha = max(alpha, value)
-    
-    # return alpha
+    alpha = max(alpha, value)
+    moves = board.legal_moves
+    for move in moves:
+        if not board.is_capture(move):
+            continue
+        board.push(move)
+        value = -qSearch( -beta, -alpha, board)
+        board.pop()
+        if value >= beta:
+            return beta
+        alpha = max(alpha, value)
+    return alpha
 
 def getOrderedMoves(onlyCaptures, board: chess.Board):
     if onlyCaptures:
-        return sorted([move for move in board.legal_moves if board.is_capture(move)], key=lambda move: getMovePriority(move, board))
-    return sorted(list(board.legal_moves), key=lambda move: eval.evaluateMove(move, board))
+        return sorted(list(board.legal_moves), key=lambda move: eval.evaluateMove(move, board))

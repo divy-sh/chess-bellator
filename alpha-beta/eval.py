@@ -76,26 +76,26 @@ def scan(bb: chess.Bitboard) -> Iterator[chess.Square]:
 #         y_hat_eval = -y_hat_eval
 #     return y_hat_eval
 
-def fen_to_features(fen):
-    piece_to_index = {'r': 0, 'n': 1, 'b': 2, 'q': 3, 'k': 4, 'p': 5,
-                      'R': 6, 'N': 7, 'B': 8, 'Q': 9, 'K': 10, 'P': 11}
+# def fen_to_features(fen):
+#     piece_to_index = {'r': 0, 'n': 1, 'b': 2, 'q': 3, 'k': 4, 'p': 5,
+#                       'R': 6, 'N': 7, 'B': 8, 'Q': 9, 'K': 10, 'P': 11}
 
-    one_hot_board = np.zeros((8, 8, 12), dtype=np.float32)
-    additional_features = np.zeros(14, dtype=np.float32)
+#     one_hot_board = np.zeros((8, 8, 12), dtype=np.float32)
+#     additional_features = np.zeros(14, dtype=np.float32)
 
-    fen_rows = fen.split()[0].split('/')
-    for row_idx, row in enumerate(fen_rows):
-        col_idx = 0
-        for char in row:
-            if char.isdigit():
-                col_idx += int(char)
-            elif char in piece_to_index:
-                piece_idx = piece_to_index[char]
-                one_hot_board[row_idx, col_idx, piece_idx] = 1
-                col_idx += 1
-    additional_features[0] = 1 if fen[1] == 'w' else 0
-    additional_features[1:5] = [int(right in fen[2]) for right in ['K', 'Q', 'k', 'q']]
-    if fen.split()[3] != '-':
-        en_passant_row = ord(fen.split()[3][0]) - ord('a')
-        additional_features[6 + en_passant_row] = 1
-    return np.concatenate([one_hot_board.flatten(), additional_features])
+#     fen_rows = fen.split()[0].split('/')
+#     for row_idx, row in enumerate(fen_rows):
+#         col_idx = 0
+#         for char in row:
+#             if char.isdigit():
+#                 col_idx += int(char)
+#             elif char in piece_to_index:
+#                 piece_idx = piece_to_index[char]
+#                 one_hot_board[row_idx, col_idx, piece_idx] = 1
+#                 col_idx += 1
+#     additional_features[0] = 1 if fen[1] == 'w' else 0
+#     additional_features[1:5] = [int(right in fen[2]) for right in ['K', 'Q', 'k', 'q']]
+#     if fen.split()[3] != '-':
+#         en_passant_row = ord(fen.split()[3][0]) - ord('a')
+#         additional_features[6 + en_passant_row] = 1
+#     return np.concatenate([one_hot_board.flatten(), additional_features])
