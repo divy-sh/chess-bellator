@@ -1,6 +1,6 @@
 # Chess-Bellator
 
-**Chess-Bellator** is a chess engine built using a combination of Deep Neural Networks (DNN), Alpha-Beta Pruning, and Monte Carlo Tree Search (MCTS). The engine is designed to explore and improve strategies for playing chess with the aid of modern AI techniques.
+**Chess-Bellator** A chess engine built using a combination of Deep Neural Networks (DNN), Alpha-Beta Pruning, and Monte Carlo Tree Search (MCTS). The engine is designed to explore and improve strategies for playing chess with the aid of modern AI techniques.
 
 ## Features
 - **Deep Neural Networks (DNN)**: Used for evaluating positions and making move predictions.
