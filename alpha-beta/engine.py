@@ -17,7 +17,7 @@ def genMoveIterative(seconds: float, board: chess.Board) -> str:
 
 # generate move with fixed depth alpha-beta search
 def genMove(depth: int, board: chess.Board) -> str:
-    moves = getOrderedMoves(onlyCaptures=False, board=board)
+    moves = getOrderedMoves(board=board)
     if not moves:
         return None, 0
     if board.is_checkmate():
@@ -81,6 +81,5 @@ def qSearch(alpha: float, beta: float, board: chess.Board):
         alpha = max(alpha, value)
     return alpha
 
-def getOrderedMoves(onlyCaptures, board: chess.Board):
-    if onlyCaptures:
-        return sorted(list(board.legal_moves), key=lambda move: eval.evaluateMove(move, board))
+def getOrderedMoves(board: chess.Board):
+    return sorted(list(board.legal_moves), key=lambda move: eval.evaluateMove(move, board))

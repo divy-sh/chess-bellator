@@ -20,7 +20,7 @@ def AIvsAI(game, engine, view):
             print(' '.join(pgn))
             return
         start_time = time.time()
-        move, eval = engine.genMove(4, game.getBoard())
+        move, eval = engine.genMoveIterative(5, game.getBoard())
         pgn.append(game.getBoard().san(move))
         game.playMove(move.uci())
         view.update()
