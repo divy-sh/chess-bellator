@@ -46,8 +46,24 @@ func StartWebUI() {
 					moveAttempt := pendingSelection + square
 					pendingSelection = ""
 
+					// Get the requested promotion piece, default to Queen
+					promo := strings.TrimSpace(r.FormValue("promo"))
+					if promo == "" {
+						promo = "q"
+					}
+
+					movePlayed := ""
+
+					// 1. Try a standard move first
 					if game.PlayMove(moveAttempt) {
-						message = fmt.Sprintf("You played %s.", moveAttempt)
+						movePlayed = moveAttempt
+					} else if game.PlayMove(moveAttempt + promo) {
+						// 2. If standard fails, try appending the promotion character
+						movePlayed = moveAttempt + "=" + strings.ToUpper(promo)
+					}
+
+					if movePlayed != "" {
+						message = fmt.Sprintf("You played %s.", movePlayed)
 
 						if !game.GameOver() {
 							if _, ok := game.PlayBestMove(); !ok {
@@ -78,6 +94,7 @@ func StartWebUI() {
 <head>
   <meta charset="utf-8" />
   <title>Chess Bellator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     :root {
       --bg-dark: #1e1e24;
@@ -88,52 +105,110 @@ func StartWebUI() {
       --white-piece: #ffffff;
       --black-piece: #111116;
     }
+    
     body { 
       font-family: system-ui, -apple-system, sans-serif; 
       background: var(--bg-dark); 
       color: #f3e7d3; 
-      padding: 40px 20px; 
-      display: flex; 
-      justify-content: center;
       margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      box-sizing: border-box;
     }
+    
+    /* Default: Stacked Layout (Mobile/Narrow/Long Screens) */
     .panel { 
-      width: 480px; 
       background: var(--panel-bg);
       padding: 24px;
       border-radius: 16px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      width: 100%;
+      max-width: 600px;
+      box-sizing: border-box;
     }
-    h2 { margin-top: 0; text-align: center; letter-spacing: 1px; color: #fff; }
+
+    /* Desktop/Wide Screens */
+    @media (min-width: 900px) {
+      .panel {
+        flex-direction: row;
+        max-width: 1200px;
+        width: 95vw;
+        align-items: stretch;
+      }
+      .sidebar {
+        width: 320px;
+        min-width: 320px;
+        display: flex;
+        flex-direction: column;
+      }
+      .board-container {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+    }
+
+    .board { 
+      display: grid; 
+      grid-template-columns: repeat(8, 1fr); 
+      grid-template-rows: repeat(8, 1fr); 
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      width: 100%;
+      aspect-ratio: 1;
+      max-width: 80vh; /* Stops board from overflowing vertically on wide screens */
+    }
+
+    .sidebar h2 { 
+      margin-top: 0; 
+      text-align: center; 
+      letter-spacing: 1px; 
+      color: #fff; 
+      margin-bottom: 20px;
+    }
     
     .turn-badge {
       text-align: center;
-      padding: 6px 12px;
+      padding: 10px 12px;
       border-radius: 20px;
       font-weight: bold;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       background: rgba(0,0,0,0.2);
-      display: inline-block;
-      width: calc(100% - 24px);
     }
     .turn-white { color: #eae9d2; border: 1px solid rgba(234,233,210, 0.3); }
     .turn-black { color: #e5a93c; border: 1px solid rgba(229,169,60, 0.3); }
 
-    .board { 
-      display: grid; 
-      grid-template-columns: repeat(8, 60px); 
-      grid-template-rows: repeat(8, 60px); 
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      background: rgba(0,0,0,0.15);
+      padding: 12px;
       border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-      margin: 0 auto 20px auto;
-      width: 480px;
     }
+    .controls select {
+      background: var(--bg-dark);
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 6px 8px;
+      outline: none;
+    }
+
     .square { 
-      width: 60px; 
-      height: 60px; 
+      width: 100%; 
+      height: 100%; 
       border: none; 
-      font-size: 44px; 
+      font-size: var(--piece-size, 44px); 
       display: flex; 
       align-items: center; 
       justify-content: center; 
@@ -142,10 +217,10 @@ func StartWebUI() {
       user-select: none; 
       transition: background 0.15s ease;
     }
+    
     .light { background: var(--light-square); }
     .dark { background: var(--dark-square); }
     
-    /* Solid chess piece custom styling */
     .p-white { color: var(--white-piece); filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.6)); }
     .p-black { color: var(--black-piece); filter: drop-shadow(0px 1px 1px rgba(255,255,255,0.4)); }
 
@@ -160,41 +235,89 @@ func StartWebUI() {
       border-left: 4px solid var(--accent);
       margin-bottom: 15px;
     }
+    
+    .pgn-container {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 100px;
+    }
+    
     .pgn-box {
       font-family: monospace;
       font-size: 0.85rem;
       background: #1e1e24;
-      padding: 10px;
+      padding: 12px;
       border-radius: 6px;
-      max-height: 60px;
+      flex: 1;
       overflow-y: auto;
       color: #a0a0b0;
+      word-break: break-word;
+      max-height: 250px;
     }
-    form { margin: 0; display: inline; }
+
+    @media (max-width: 899px) {
+      .pgn-box { max-height: 120px; }
+    }
   </style>
 </head>
 <body>
-  <div class="panel">
-    <h2>Chess Bellator</h2>
-    <div class="turn-badge {{if eq .Turn "White"}}turn-white{{else}}turn-black{{end}}">
-      {{.Turn}} to Move
+  <!-- By wrapping everything in the form, layout scaling natively captures both board clicks & options -->
+  <form method="post" class="panel">
+    <div class="board-container">
+      <div class="board">
+        {{range .Squares}}
+          <button class="square {{.Class}} {{if eq .Name $.PendingSquare}}selected{{end}}" type="submit" name="square" value="{{.Name}}">
+            <span class="{{.PieceClass}}">{{.Label}}</span>
+          </button>
+        {{end}}
+      </div>
     </div>
     
-    <div class="board">
-      {{range .Squares}}
-      <form method="post">
-        <input type="hidden" name="square" value="{{.Name}}" />
-        <button class="square {{.Class}} {{if eq .Name $.PendingSquare}}selected{{end}}" type="submit">
-          <span class="{{.PieceClass}}">{{.Label}}</span>
-        </button>
-      </form>
-      {{end}}
+    <div class="sidebar">
+      <h2>Chess Bellator</h2>
+      <div class="turn-badge {{if eq .Turn "White"}}turn-white{{else}}turn-black{{end}}">
+        {{.Turn}} to Move
+      </div>
+      
+      <div class="controls">
+        <span style="font-size: 0.9rem; color: #a0a0b0;"><strong>Auto-Promote To:</strong></span>
+        <select name="promo">
+          <option value="q">Queen (♛)</option>
+          <option value="r">Rook (♜)</option>
+          <option value="b">Bishop (♝)</option>
+          <option value="n">Knight (♞)</option>
+        </select>
+      </div>
+      
+      <div class="status-text"><strong>Status:</strong> {{.Message}}</div>
+      
+      <div class="pgn-container">
+        <div style="margin-bottom: 8px;"><small style="color:#aaa;"><strong>PGN History:</strong></small></div>
+        <div class="pgn-box">{{if .PGN}}{{.PGN}}{{else}}<em>No moves played yet.</em>{{end}}</div>
+      </div>
     </div>
+  </form>
+
+  <script>
+    // Dynamically adjust Unicode piece sizing to perfectly fit responsive grid cells
+    function resizePieces() {
+      const board = document.querySelector('.board');
+      const firstSquare = document.querySelector('.square');
+      if (firstSquare) {
+        // Calculate 75% of the square's width for optimal padding
+        const size = firstSquare.getBoundingClientRect().width * 0.75;
+        board.style.setProperty('--piece-size', size + 'px');
+      }
+    }
     
-    <div class="status-text"><strong>Status:</strong> {{.Message}}</div>
-    <div><small style="color:#aaa;"><strong>PGN History:</strong></small></div>
-    <div class="pgn-box">{{if .PGN}}{{.PGN}}{{else}}<em>No moves played yet.</em>{{end}}</div>
-  </div>
+    // Bind to window events
+    window.addEventListener('resize', resizePieces);
+    window.addEventListener('DOMContentLoaded', resizePieces);
+    
+    // Safety fallback for initial DOM rendering phase delays
+    setTimeout(resizePieces, 100);
+  </script>
 </body>
 </html>`))
 
