@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/corentings/chess"
 )
@@ -14,79 +15,141 @@ type pageData struct {
 	Message       string
 	Turn          string
 	PendingSquare string
+	AIPending     bool
+	LockedBoard   bool
 	Squares       []squareButton
 }
 
 type squareButton struct {
 	Name       string
 	Label      string
-	Class      string // Controls the square color (light/dark)
-	PieceClass string // Controls the piece color (p-white/p-black)
+	Class      string
+	PieceClass string
+	IsLastMove bool
 }
 
 func StartWebUI() {
 	game := NewGameWrapper()
 	pendingSelection := ""
+	lastSrc := ""
+	lastDst := ""
+	playerColor := chess.White
+
+	var mu sync.Mutex
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		message := "Your turn. Click a piece, then click a destination square."
+		mu.Lock()
+		defer mu.Unlock()
+
+		message := "Your turn. Click a piece, then a destination square."
+		if game.GameOver() {
+			message = "Game Over! Start a new game."
+		}
+
+		aiPending := false
 
 		if r.Method == http.MethodPost {
 			_ = r.ParseForm()
 
-			if square := strings.TrimSpace(r.FormValue("square")); square != "" {
-				switch pendingSelection {
-				case "":
-					pendingSelection = square
-					message = fmt.Sprintf("Selected %s.", square)
-				case square:
-					pendingSelection = ""
-					message = "Selection cleared."
-				default:
-					moveAttempt := pendingSelection + square
-					pendingSelection = ""
+			// Differentiate between button clicks and automatic AI triggers
+			action := r.FormValue("action")
+			if action == "" {
+				action = r.FormValue("auto_action")
+			}
 
-					// Get the requested promotion piece, default to Queen
-					promo := strings.TrimSpace(r.FormValue("promo"))
-					if promo == "" {
-						promo = "q"
-					}
-
-					movePlayed := ""
-
-					// 1. Try a standard move first
-					if game.PlayMove(moveAttempt) {
-						movePlayed = moveAttempt
-					} else if game.PlayMove(moveAttempt + promo) {
-						// 2. If standard fails, try appending the promotion character
-						movePlayed = moveAttempt + "=" + strings.ToUpper(promo)
-					}
-
-					if movePlayed != "" {
-						message = fmt.Sprintf("You played %s.", movePlayed)
-
-						if !game.GameOver() {
-							if _, ok := game.PlayBestMove(); !ok {
-								message += " AI failed to respond."
-							}
+			if action == "new_white" {
+				game = NewGameWrapper()
+				playerColor = chess.White
+				pendingSelection = ""
+				lastSrc, lastDst = "", ""
+				message = "New game started. You are White."
+			} else if action == "new_black" {
+				game = NewGameWrapper()
+				playerColor = chess.Black
+				pendingSelection = ""
+				lastSrc, lastDst = "", ""
+				message = "New game started. You are Black. AI is thinking..."
+				aiPending = true
+			} else if action == "aimove" {
+				if !game.GameOver() && game.Position().Turn() != playerColor {
+					if aiMove, ok := game.PlayBestMove(); ok {
+						aiMoveStr := fmt.Sprintf("%v", aiMove)
+						if len(aiMoveStr) >= 4 {
+							lastSrc = aiMoveStr[:2]
+							lastDst = aiMoveStr[2:4]
+						}
+						message = "AI played. Your turn."
+						if game.GameOver() {
+							message = "Game Over!"
 						}
 					} else {
-						message = "Invalid move selection."
+						message = "AI failed to respond."
+					}
+				}
+			} else if square := strings.TrimSpace(r.FormValue("square")); square != "" {
+				if game.GameOver() {
+					message = "Game Over! Please start a new game."
+					pendingSelection = ""
+				} else if game.Position().Turn() != playerColor {
+					message = "Please wait for the AI to move."
+					pendingSelection = ""
+				} else {
+					switch pendingSelection {
+					case "":
+						p := game.Position().Board().Piece(squareToSquare(square))
+						if p != chess.NoPiece && p.Color() == playerColor {
+							pendingSelection = square
+							message = fmt.Sprintf("Selected %s.", square)
+						} else {
+							message = "Please select one of your own pieces."
+						}
+					case square:
+						pendingSelection = ""
+						message = "Selection cleared."
+					default:
+						moveAttempt := pendingSelection + square
+						pendingSelection = ""
+
+						promo := strings.TrimSpace(r.FormValue("promo"))
+						if promo == "" {
+							promo = "q"
+						}
+
+						movePlayed := ""
+						if game.PlayMove(moveAttempt) {
+							movePlayed = moveAttempt
+						} else if game.PlayMove(moveAttempt + promo) {
+							movePlayed = moveAttempt + "=" + strings.ToUpper(promo)
+						}
+
+						if movePlayed != "" {
+							message = fmt.Sprintf("You played %s. AI is thinking...", movePlayed)
+							lastSrc = moveAttempt[:2]
+							lastDst = moveAttempt[2:4]
+
+							if !game.GameOver() {
+								aiPending = true
+							} else {
+								message = "Game Over!"
+							}
+						} else {
+							message = "Invalid move selection."
+						}
 					}
 				}
 			}
 		}
 
-		if game.GameOver() {
-			message = "Game Over!"
-		}
+		isLocked := aiPending || game.GameOver()
 
 		data := pageData{
 			PGN:           game.PGN(),
 			Turn:          strings.Title(game.Position().Turn().String()),
 			Message:       message,
 			PendingSquare: pendingSelection,
-			Squares:       buildSquareButtons(game),
+			AIPending:     aiPending,
+			LockedBoard:   isLocked,
+			Squares:       buildSquareButtons(game, lastSrc, lastDst, playerColor),
 		}
 
 		tmpl := template.Must(template.New("board").Parse(`<!doctype html>
@@ -119,7 +182,6 @@ func StartWebUI() {
       box-sizing: border-box;
     }
     
-    /* Default: Stacked Layout (Mobile/Narrow/Long Screens) */
     .panel { 
       background: var(--panel-bg);
       padding: 24px;
@@ -133,7 +195,6 @@ func StartWebUI() {
       box-sizing: border-box;
     }
 
-    /* Desktop/Wide Screens */
     @media (min-width: 900px) {
       .panel {
         flex-direction: row;
@@ -164,7 +225,11 @@ func StartWebUI() {
       box-shadow: 0 8px 24px rgba(0,0,0,0.3);
       width: 100%;
       aspect-ratio: 1;
-      max-width: 80vh; /* Stops board from overflowing vertically on wide screens */
+      max-width: 80vh;
+    }
+
+    .locked {
+      pointer-events: none;
     }
 
     .sidebar h2 { 
@@ -188,13 +253,39 @@ func StartWebUI() {
 
     .controls {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
+      flex-direction: column;
+      gap: 12px;
       margin-bottom: 15px;
       background: rgba(0,0,0,0.15);
       padding: 12px;
       border-radius: 8px;
     }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .btn {
+      background: var(--dark-square);
+      color: #fff;
+      border: none;
+      padding: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      flex: 1;
+      font-weight: bold;
+      transition: filter 0.15s ease;
+    }
+    .btn:hover { filter: brightness(1.2); }
+
+    .promo-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
     .controls select {
       background: var(--bg-dark);
       color: #fff;
@@ -202,6 +293,8 @@ func StartWebUI() {
       border-radius: 4px;
       padding: 6px 8px;
       outline: none;
+      flex: 1;
+      margin-left: 10px;
     }
 
     .square { 
@@ -221,6 +314,9 @@ func StartWebUI() {
     .light { background: var(--light-square); }
     .dark { background: var(--dark-square); }
     
+    .light.last-move { background: #f6f669; }
+    .dark.last-move { background: #baca44; }
+
     .p-white { color: var(--white-piece); filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.6)); }
     .p-black { color: var(--black-piece); filter: drop-shadow(0px 1px 1px rgba(255,255,255,0.4)); }
 
@@ -234,6 +330,17 @@ func StartWebUI() {
       font-size: 0.95rem;
       border-left: 4px solid var(--accent);
       margin-bottom: 15px;
+      transition: all 0.3s ease;
+    }
+
+    .thinking-anim {
+      animation: pulseBG 1s infinite alternate;
+      border-left-color: #f6f669;
+    }
+
+    @keyframes pulseBG {
+      0% { background: rgba(0,0,0,0.15); }
+      100% { background: rgba(229, 169, 60, 0.25); }
     }
     
     .pgn-container {
@@ -262,12 +369,14 @@ func StartWebUI() {
   </style>
 </head>
 <body>
-  <!-- By wrapping everything in the form, layout scaling natively captures both board clicks & options -->
-  <form method="post" class="panel">
+  <form method="post" class="panel" id="chess-form">
+    <!-- Updated the name here to auto_action to avoid conflicts -->
+    <input type="hidden" name="auto_action" id="auto-action" value="">
+
     <div class="board-container">
-      <div class="board">
+      <div class="board {{if .LockedBoard}}locked{{end}}" id="chess-board">
         {{range .Squares}}
-          <button class="square {{.Class}} {{if eq .Name $.PendingSquare}}selected{{end}}" type="submit" name="square" value="{{.Name}}">
+          <button class="square {{.Class}} {{if .IsLastMove}}last-move{{end}} {{if eq .Name $.PendingSquare}}selected{{end}}" type="submit" name="square" value="{{.Name}}">
             <span class="{{.PieceClass}}">{{.Label}}</span>
           </button>
         {{end}}
@@ -281,16 +390,22 @@ func StartWebUI() {
       </div>
       
       <div class="controls">
-        <span style="font-size: 0.9rem; color: #a0a0b0;"><strong>Auto-Promote To:</strong></span>
-        <select name="promo">
-          <option value="q">Queen (♛)</option>
-          <option value="r">Rook (♜)</option>
-          <option value="b">Bishop (♝)</option>
-          <option value="n">Knight (♞)</option>
-        </select>
+        <div class="btn-row">
+          <button type="submit" name="action" value="new_white" class="btn">New (White)</button>
+          <button type="submit" name="action" value="new_black" class="btn">New (Black)</button>
+        </div>
+        <div class="promo-row">
+          <span style="font-size: 0.85rem; color: #a0a0b0;"><strong>Promote To:</strong></span>
+          <select name="promo">
+            <option value="q">Queen (♛)</option>
+            <option value="r">Rook (♜)</option>
+            <option value="b">Bishop (♝)</option>
+            <option value="n">Knight (♞)</option>
+          </select>
+        </div>
       </div>
       
-      <div class="status-text"><strong>Status:</strong> {{.Message}}</div>
+      <div id="status-box" class="status-text {{if .AIPending}}thinking-anim{{end}}"><strong>Status:</strong> {{.Message}}</div>
       
       <div class="pgn-container">
         <div style="margin-bottom: 8px;"><small style="color:#aaa;"><strong>PGN History:</strong></small></div>
@@ -300,23 +415,33 @@ func StartWebUI() {
   </form>
 
   <script>
-    // Dynamically adjust Unicode piece sizing to perfectly fit responsive grid cells
     function resizePieces() {
       const board = document.querySelector('.board');
       const firstSquare = document.querySelector('.square');
       if (firstSquare) {
-        // Calculate 75% of the square's width for optimal padding
         const size = firstSquare.getBoundingClientRect().width * 0.75;
         board.style.setProperty('--piece-size', size + 'px');
       }
     }
     
-    // Bind to window events
     window.addEventListener('resize', resizePieces);
     window.addEventListener('DOMContentLoaded', resizePieces);
-    
-    // Safety fallback for initial DOM rendering phase delays
     setTimeout(resizePieces, 100);
+
+    document.querySelectorAll('.square').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('chess-board').classList.add('locked');
+        document.getElementById('status-box').classList.add('thinking-anim');
+      });
+    });
+
+    {{if .AIPending}}
+      setTimeout(() => {
+        // Updated to target the correct input
+        document.getElementById('auto-action').value = 'aimove';
+        document.getElementById('chess-form').submit();
+      }, 50);
+    {{end}}
   </script>
 </body>
 </html>`))
@@ -329,10 +454,19 @@ func StartWebUI() {
 	_ = http.ListenAndServe(":8080", nil)
 }
 
-func buildSquareButtons(game *GameWrapper) []squareButton {
+func buildSquareButtons(game *GameWrapper, lastSrc, lastDst string, playerColor chess.Color) []squareButton {
 	buttons := make([]squareButton, 0, 64)
-	for rank := 8; rank >= 1; rank-- {
-		for file := 'a'; file <= 'h'; file++ {
+
+	ranks := []int{8, 7, 6, 5, 4, 3, 2, 1}
+	files := []rune{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'}
+
+	if playerColor == chess.Black {
+		ranks = []int{1, 2, 3, 4, 5, 6, 7, 8}
+		files = []rune{'h', 'g', 'f', 'e', 'd', 'c', 'b', 'a'}
+	}
+
+	for _, rank := range ranks {
+		for _, file := range files {
 			squareStr := fmt.Sprintf("%c%d", file, rank)
 			piece := game.Position().Board().Piece(squareToSquare(squareStr))
 
@@ -350,11 +484,14 @@ func buildSquareButtons(game *GameWrapper) []squareButton {
 				}
 			}
 
+			isLastMove := (squareStr == lastSrc || squareStr == lastDst)
+
 			buttons = append(buttons, squareButton{
 				Name:       squareStr,
 				Label:      getSolidPiece(piece),
 				Class:      class,
 				PieceClass: pieceClass,
+				IsLastMove: isLastMove,
 			})
 		}
 	}
